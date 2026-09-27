@@ -560,14 +560,11 @@
       </div>
       <div class="field">
         <label>Valor comercial (R$)</label>
-        <input type="text" id="lf-valorcomercial" placeholder="0,00" oninput="maskMoney(this); atualizarPctInicial('lf')">
+        <input type="text" id="lf-valorcomercial" placeholder="0,00" oninput="maskMoney(this); autoAplicarDesconto('lf')">
       </div>
       <div class="field">
         <label>Valor inicial (R$)</label>
-        <div style="display:flex;gap:8px">
-          <input type="text" id="lf-valorinicial" placeholder="0,00" style="flex:1" oninput="maskMoney(this); atualizarPctInicial('lf')">
-          <button type="button" class="btn-outline" onclick="aplicarDescontoPadrao('lf')" style="white-space:nowrap" title="Calcular a partir do desconto padrão">% Aplicar</button>
-        </div>
+        <input type="text" id="lf-valorinicial" placeholder="0,00" oninput="maskMoney(this); atualizarPctInicial('lf')">
         <span id="lf-pct-inicial-hint" class="photo-hint"></span>
       </div>
     </div>
@@ -631,14 +628,11 @@
       </div>
       <div class="field">
         <label>Valor comercial (R$)</label>
-        <input type="text" id="nf-valorcomercial" placeholder="0,00" oninput="maskMoney(this); atualizarPctInicial('nf')">
+        <input type="text" id="nf-valorcomercial" placeholder="0,00" oninput="maskMoney(this); autoAplicarDesconto('nf')">
       </div>
       <div class="field">
         <label>Valor inicial (R$)</label>
-        <div style="display:flex;gap:8px">
-          <input type="text" id="nf-valorinicial" placeholder="0,00" style="flex:1" oninput="maskMoney(this); atualizarPctInicial('nf')">
-          <button type="button" class="btn-outline" onclick="aplicarDescontoPadrao('nf')" style="white-space:nowrap" title="Calcular a partir do desconto padrão">% Aplicar</button>
-        </div>
+        <input type="text" id="nf-valorinicial" placeholder="0,00" oninput="maskMoney(this); atualizarPctInicial('nf')">
         <span id="nf-pct-inicial-hint" class="photo-hint"></span>
       </div>
     </div>
@@ -1376,18 +1370,16 @@ function parseMoneyInput(str) {
 }
 
 // ═══════════ % DO VALOR INICIAL SOBRE O VALOR COMERCIAL ═══════════
-function aplicarDescontoPadrao(prefix) {
+function autoAplicarDesconto(prefix) {
   const cfg = getConfigAtual();
   const pct = parseFloat((cfg.descontoPadrao || '0').replace(',','.'));
   const comercial = parseMoneyInput(document.getElementById(prefix + '-valorcomercial').value);
 
-  if (!comercial) { showToast('⚠️','Informe o valor comercial primeiro.',''); return; }
-  if (!pct) { showToast('⚠️','Defina o desconto padrão em ⚙️ Leilão.',''); return; }
-
-  const inicial = comercial * (1 - pct / 100);
-  document.getElementById(prefix + '-valorinicial').value = inicial.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+  if (comercial && pct) {
+    const inicial = comercial * (1 - pct / 100);
+    document.getElementById(prefix + '-valorinicial').value = inicial.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
   atualizarPctInicial(prefix);
-  showToast('✅', `Valor inicial calculado com -${pct}%`, 'success');
 }
 
 function atualizarPctInicial(prefix) {
