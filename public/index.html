@@ -23,6 +23,13 @@
     padding-top:env(safe-area-inset-top,0px);
     padding-bottom:env(safe-area-inset-bottom,0px);
   }
+  :root { --on-accent:#1a1105; }
+  :root[data-theme="light"] {
+    --bg:#eaf7ec; --surface:#f4fbf5; --surface2:#deefe0; --border:#bfe0c4;
+    --accent:#22c55e; --accent2:#16a34a; --text:#173b1f; --text2:#4d7355; --text3:#7fa686;
+    --shadow:0 4px 20px rgba(23,59,31,.12);
+    --on-accent:#ffffff;
+  }
   *,*::before,*::after{box-sizing:inherit;margin:0;padding:0}
   html,body{height:100%}
   body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100dvh;display:flex;flex-direction:column}
@@ -35,7 +42,7 @@
 
   nav{display:flex;gap:4px;background:var(--surface2);padding:4px;border-radius:10px;overflow-x:auto}
   .nav-btn{background:none;border:none;color:var(--text2);padding:8px 14px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
-  .nav-btn.active{background:var(--accent);color:#1a1105}
+  .nav-btn.active{background:var(--accent);color:var(--on-accent)}
   .nav-btn:not(.active):hover{background:var(--border);color:var(--text)}
 
   .presence{display:flex;align-items:center;gap:8px}
@@ -116,14 +123,14 @@
   .search-box{flex:1;min-width:200px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:10px 14px;outline:none}
   .search-box:focus{border-color:var(--accent)}
   .filter-select{background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:10px 12px;outline:none;cursor:pointer}
-  .btn{background:var(--accent);color:#1a1105;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;transition:opacity .15s,transform .1s;display:flex;align-items:center;gap:6px}
+  .btn{background:var(--accent);color:var(--on-accent);border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;transition:opacity .15s,transform .1s;display:flex;align-items:center;gap:6px}
   .btn:hover{opacity:.88} .btn:active{transform:scale(.97)}
   .btn:disabled{opacity:.5;cursor:default}
   .btn-outline{background:transparent;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s;display:flex;align-items:center;gap:6px}
   .btn-outline:hover{background:var(--surface2)}
   .btn-sm{padding:6px 12px;font-size:12px;border-radius:7px;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:600;transition:background .15s;display:flex;align-items:center;gap:4px}
   .btn-sm:hover{background:var(--border)}
-  .btn-sm.primary{background:var(--accent);color:#1a1105;border-color:var(--accent)}
+  .btn-sm.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
   .btn-sm.danger:hover{border-color:var(--red);color:var(--red)}
 
   /* LISTA / TABELA */
@@ -212,11 +219,30 @@
   .print-card.cartao .campo-label{font-weight:700;color:#666;font-size:9px;margin-top:8px;text-align:left}
 
   @media print {
-    header, .print-controls, .toolbar, footer, .no-print { display:none !important; }
+    header, .print-controls, .toolbar, footer, .no-print, .scanner-box { display:none !important; }
     body { background:#fff; color:#000; }
     .container { padding:0; max-width:100%; }
     .print-grid { gap:8px; }
     .print-card { border-color:#333; }
+
+    .print-lista-titulo { display:block !important; }
+
+    .view#view-lista { display:block !important; }
+    .table-section { border:none !important; background:#fff !important; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { color:#000 !important; border-bottom:1px solid #ccc !important; background:#fff !important; padding:6px 8px !important; font-size:11px !important; }
+    th { background:#f0f0f0 !important; }
+    tr:hover td { background:#fff !important; }
+    table th:last-child, table td:last-child { display:none; } /* coluna Ações */
+    table th:nth-child(2), table td:nth-child(2),
+    table th:nth-child(8), table td:nth-child(8),
+    table th:nth-child(10), table td:nth-child(10) { display:none; } /* Cód. Barras, %, Pgto */
+    .table-photo, .table-photo-placeholder { display:none; }
+    .produto-cell { display:block; }
+    .badge { border:1px solid #999 !important; background:#fff !important; color:#000 !important; padding:2px 6px; }
+    .valor-comercial { color:#666 !important; }
+    .valor-arrematado { color:#000 !important; }
+    .empty-state { display:none !important; }
   }
 
   .toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 18px;font-size:14px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow);z-index:500;transform:translateY(80px);opacity:0;transition:all .25s ease;max-width:320px}
@@ -321,6 +347,7 @@
     <button class="nav-btn" data-view="usuarios" onclick="switchView('usuarios')">👥 Usuários</button>
   </nav>
   <div class="presence">
+    <button class="btn-sm no-print" onclick="toggleTema()" id="btn-tema" title="Alternar entre dia e noite">🌙</button>
     <button class="btn-sm no-print" onclick="abrirModalConfig()" title="Editar nome, data e ano do leilão">⚙️ Leilão</button>
     <span class="user-badge" id="user-badge"></span>
     <button class="btn-sm no-print" onclick="doLogout()" title="Sair">🚪 Sair</button>
@@ -404,6 +431,11 @@
         <option value="NAO">Pendente</option>
       </select>
       <button class="btn" onclick="abrirModalNovo()">➕ Novo Lote</button>
+      <button class="btn-outline no-print" onclick="imprimirLista()">🖨️ Imprimir lista</button>
+    </div>
+    <div class="print-lista-titulo" style="display:none;text-align:center;margin-bottom:14px">
+      <h2 id="print-lista-nome" style="margin:0;font-size:18px">Leilão</h2>
+      <p id="print-lista-data" style="margin:4px 0 0;font-size:11px;color:#666">Lista de lotes</p>
     </div>
     <div class="table-section">
       <div class="table-wrap">
@@ -782,6 +814,21 @@
 <footer id="leilao-footer">Leilão IBESAJ · Sistema online — sincronizado em tempo real entre todos os aparelhos.</footer>
 
 <script>
+// ═══════════ TEMA (dia / noite) ═══════════
+function aplicarTema(tema) {
+  document.documentElement.setAttribute('data-theme', tema);
+  localStorage.setItem('leilao_tema', tema);
+  const btn = document.getElementById('btn-tema');
+  if (btn) btn.textContent = tema === 'light' ? '☀️' : '🌙';
+}
+
+function toggleTema() {
+  const atual = document.documentElement.getAttribute('data-theme') || 'dark';
+  aplicarTema(atual === 'light' ? 'dark' : 'light');
+}
+
+aplicarTema(localStorage.getItem('leilao_tema') || 'dark');
+
 // ═══════════ STATE ═══════════
 let lotesCache = {};   // id -> lote
 let usersCache = [];
@@ -1813,6 +1860,16 @@ function fecharCamera() {
 function tituloParaImpressao() {
   const el = document.getElementById('leilao-titulo');
   return el ? el.textContent.toUpperCase() : 'LEILÃO';
+}
+
+// ═══════════ IMPRIMIR LISTA DE LOTES (PDF via impressão do navegador) ═══════════
+function imprimirLista() {
+  const titulo = document.getElementById('leilao-titulo').textContent;
+  const agora = new Date().toLocaleDateString('pt-BR');
+  document.getElementById('print-lista-nome').textContent = titulo;
+  document.getElementById('print-lista-data').textContent = `Lista de lotes — gerado em ${agora}`;
+  document.querySelector('.print-lista-titulo').style.display = 'block';
+  window.print();
 }
 
 function renderEtiquetas() {
