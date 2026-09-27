@@ -1003,6 +1003,7 @@ async function salvarConfig() {
   const nome = document.getElementById('cf-nome').value.trim();
   if (!nome) { showToast('⚠️','Informe o nome do leilão.',''); return; }
 
+  const descontoAntigo = configAtualCache.descontoPadrao || '';
   const cfg = {
     nome,
     edicao: document.getElementById('cf-edicao').value.trim(),
@@ -1010,6 +1011,7 @@ async function salvarConfig() {
     ano: document.getElementById('cf-ano').value.trim(),
     descontoPadrao: document.getElementById('cf-descontopadrao').value.trim(),
   };
+  const descontoMudou = cfg.descontoPadrao && cfg.descontoPadrao !== descontoAntigo;
 
   try {
     await api('/config', { method: 'PUT', body: JSON.stringify(cfg) });
@@ -1018,6 +1020,26 @@ async function salvarConfig() {
     renderCartoes();
     showToast('✅','Configurações do leilão atualizadas!','success');
     closeModalConfig();
+
+    if (descontoMudou && currentUser && currentUser.master) {
+      const quer = await confirmarAcao(
+        'Recalcular lotes já cadastrados?',
+        `Você mudou o desconto padrão para ${cfg.descontoPadrao}%. Quer recalcular o valor inicial de todos os lotes já cadastrados com essa nova porcentagem? Isso vai sobrescrever o valor inicial atual de cada um.`
+      );
+      if (quer) {
+        const ok = await confirmarComSenha(`Confirme sua senha para recalcular todos os lotes com ${cfg.descontoPadrao}% de desconto.`);
+        if (ok) {
+          try {
+            const result = await api('/lotes/recalcular-inicial', { method: 'POST' });
+            await carregarTudo();
+            renderAll();
+            showToast('✅', `${result.afetados} lotes recalculados com ${result.percentual}%!`, 'success');
+          } catch(e2) {
+            showToast('❌', e2.message || 'Erro ao recalcular.', 'error');
+          }
+        }
+      }
+    }
   } catch(e) {
     showToast('❌', e.message || 'Erro ao salvar.', 'error');
   }
