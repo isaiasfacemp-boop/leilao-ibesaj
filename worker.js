@@ -141,6 +141,15 @@ async function handleApi(request, env, url) {
     return json({ user: { username: auth.username, master: auth.master } });
   }
 
+  if (path === "/api/verify-password" && method === "POST") {
+    const body = await readJson(request, 2000);
+    const password = typeof body.password === "string" ? body.password : "";
+    const row = await env.DB.prepare("SELECT salt, password_hash FROM users WHERE username = ?").bind(auth.username).first();
+    if (!row) return json({ ok: false });
+    const hash = await hashPassword(password, row.salt);
+    return json({ ok: hash === row.password_hash });
+  }
+
   // ───────── CONFIG DO LEILÃO ─────────
   if (path === "/api/config" && method === "GET") {
     const row = await env.DB.prepare("SELECT * FROM config WHERE id = 1").first();
