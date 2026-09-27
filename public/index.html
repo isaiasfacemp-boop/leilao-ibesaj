@@ -742,6 +742,47 @@
   </div>
 </div>
 
+<!-- MODAL DE CONFIRMAÇÃO (substitui o confirm() nativo do navegador) -->
+<div class="modal-overlay" id="modal-confirm-overlay">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-head">
+      <div>
+        <h2 id="confirm-titulo">Confirmar</h2>
+      </div>
+    </div>
+    <div class="modal-body">
+      <p id="confirm-mensagem" style="font-size:14px;color:var(--text);line-height:1.5"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-outline" id="confirm-btn-cancelar">Cancelar</button>
+      <button class="btn" id="confirm-btn-ok">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DE CONFIRMAÇÃO COM SENHA (ações perigosas: excluir, desfazer, remover usuário) -->
+<div class="modal-overlay" id="modal-senha-confirm-overlay">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-head">
+      <div>
+        <h2>🔒 Confirme sua senha</h2>
+      </div>
+    </div>
+    <div class="modal-body">
+      <p id="senha-confirm-mensagem" style="font-size:14px;color:var(--text);line-height:1.5;margin-bottom:14px"></p>
+      <div class="field">
+        <label>Digite sua senha para continuar</label>
+        <input type="password" id="senha-confirm-input" placeholder="Sua senha" autocomplete="current-password">
+        <span id="senha-confirm-erro" style="font-size:11px;color:var(--red);display:none">❌ Senha incorreta.</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-outline" id="senha-confirm-btn-cancelar">Cancelar</button>
+      <button class="btn" id="senha-confirm-btn-ok">🔒 Confirmar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <footer id="leilao-footer">Leilão IBESAJ · Sistema online — sincronizado em tempo real entre todos os aparelhos.</footer>
@@ -860,7 +901,8 @@ async function doLogin() {
 }
 
 async function doLogout() {
-  if (!confirm('Deseja sair do sistema?')) return;
+  const ok = await confirmarAcao('Sair do sistema', 'Deseja sair do sistema?');
+  if (!ok) return;
   try { await api('/logout', { method: 'POST' }); } catch(e) {}
   authToken = null;
   currentUser = null;
@@ -1255,7 +1297,8 @@ async function salvarArremate() {
 async function marcarDisponivel() {
   if (!editingLoteId) return;
   if (!currentUser || !currentUser.master) { showToast('🔒','Somente administradores podem desfazer um arremate.','error'); return; }
-  if (!confirm('Desfazer este arremate e voltar o lote para disponível?')) return;
+  const ok = await confirmarComSenha('Desfazer este arremate e voltar o lote para disponível?');
+  if (!ok) return;
 
   const payload = {
     valorArrematado: null, comprador: '', contato: '', formaPgto: '', pago: 'NAO', status: 'DISPONÍVEL'
@@ -1395,7 +1438,8 @@ async function excluirLoteAtual() {
   const msg = lote.status === 'ARREMATADO'
     ? `Este lote (#${lote.numero}) já foi arrematado por "${lote.comprador || 'alguém'}". Excluir mesmo assim?`
     : `Excluir o lote #${lote.numero} — "${lote.produto}"?`;
-  if (!confirm(msg)) return;
+  const ok = await confirmarComSenha(msg);
+  if (!ok) return;
 
   try {
     await api('/lotes/' + editingLoteDataId, { method: 'DELETE' });
@@ -1845,7 +1889,8 @@ async function salvarUsuario() {
 }
 
 async function excluirUsuario(username) {
-  if (!confirm(`Remover o acesso de "${username}"?`)) return;
+  const ok = await confirmarComSenha(`Remover o acesso de "${username}"?`);
+  if (!ok) return;
   try {
     await api('/users/' + encodeURIComponent(username), { method: 'DELETE' });
     showToast('🗑️','Usuário removido.','success');
@@ -1856,6 +1901,81 @@ async function excluirUsuario(username) {
 }
 
 // ═══════════ TOAST ═══════════
+// ═══════════ CONFIRMAÇÃO (substitui confirm() nativo do navegador) ═══════════
+function confirmarAcao(titulo, mensagem) {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('modal-confirm-overlay');
+    document.getElementById('confirm-titulo').textContent = titulo;
+    document.getElementById('confirm-mensagem').textContent = mensagem;
+    overlay.classList.add('open');
+
+    const btnOk = document.getElementById('confirm-btn-ok');
+    const btnCancelar = document.getElementById('confirm-btn-cancelar');
+
+    function limpar() {
+      overlay.classList.remove('open');
+      btnOk.onclick = null;
+      btnCancelar.onclick = null;
+    }
+    btnOk.onclick = () => { limpar(); resolve(true); };
+    btnCancelar.onclick = () => { limpar(); resolve(false); };
+  });
+}
+
+// ═══════════ CONFIRMAÇÃO COM SENHA (ações perigosas) ═══════════
+function confirmarComSenha(mensagem) {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('modal-senha-confirm-overlay');
+    const input = document.getElementById('senha-confirm-input');
+    const erro = document.getElementById('senha-confirm-erro');
+    document.getElementById('senha-confirm-mensagem').textContent = mensagem;
+    input.value = '';
+    erro.style.display = 'none';
+    overlay.classList.add('open');
+    setTimeout(() => input.focus(), 100);
+
+    const btnOk = document.getElementById('senha-confirm-btn-ok');
+    const btnCancelar = document.getElementById('senha-confirm-btn-cancelar');
+
+    function limpar() {
+      overlay.classList.remove('open');
+      btnOk.onclick = null;
+      btnCancelar.onclick = null;
+      input.onkeydown = null;
+    }
+
+    async function tentarConfirmar() {
+      const senha = input.value;
+      if (!senha) { erro.textContent = '⚠️ Digite sua senha.'; erro.style.display = 'block'; return; }
+      btnOk.disabled = true;
+      btnOk.textContent = '⏳ Verificando…';
+      try {
+        const result = await api('/verify-password', { method: 'POST', body: JSON.stringify({ password: senha }) });
+        btnOk.disabled = false;
+        btnOk.textContent = '🔒 Confirmar';
+        if (result.ok) {
+          limpar();
+          resolve(true);
+        } else {
+          erro.textContent = '❌ Senha incorreta.';
+          erro.style.display = 'block';
+          input.value = '';
+          input.focus();
+        }
+      } catch(e) {
+        btnOk.disabled = false;
+        btnOk.textContent = '🔒 Confirmar';
+        erro.textContent = '❌ Erro ao verificar. Tente novamente.';
+        erro.style.display = 'block';
+      }
+    }
+
+    btnOk.onclick = tentarConfirmar;
+    btnCancelar.onclick = () => { limpar(); resolve(false); };
+    input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); tentarConfirmar(); } };
+  });
+}
+
 function showToast(icon, msg, type) {
   const t = document.getElementById('toast');
   t.innerHTML = `<span>${icon}</span><span>${msg}</span>`;
