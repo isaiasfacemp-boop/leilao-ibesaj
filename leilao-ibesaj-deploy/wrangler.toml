@@ -1,0 +1,12 @@
+name = "leilao-ibesaj"
+main = "worker.js"
+compatibility_date = "2026-09-26"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "leilao-ibesaj-db"
+database_id = "05552fe1-404c-4698-91fb-1ddc7922b52d"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
