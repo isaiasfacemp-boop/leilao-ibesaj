@@ -1,6 +1,6 @@
-name = "leilao-ibesaj-api"
+name = "leilao-ibesaj"
 main = "worker.js"
-compatibility_date = "2024-09-23"
+compatibility_date = "2026-09-26"
 
 [[d1_databases]]
 binding = "DB"
