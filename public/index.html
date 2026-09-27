@@ -1290,6 +1290,7 @@ function renderLista() {
       <td>
         <div style="display:flex;gap:5px">
           <button class="btn-sm primary" onclick="abrirModal('${l.id}')" title="Registrar/editar arremate">🔨</button>
+          ${l.status==='ARREMATADO' ? `<button class="btn-sm" onclick="abrirModalPagamento('${l.id}')" title="Atualizar pagamento">💳</button>` : ''}
           <button class="btn-sm" onclick="abrirModalLote('${l.id}')" title="Editar dados do lote">✏️</button>
         </div>
       </td>
@@ -1310,7 +1311,7 @@ function escapeHtml(s) {
 }
 
 // ═══════════ MODAL DE ARREMATE ═══════════
-function abrirModal(id) {
+function abrirModal(id, passoInicial) {
   const lote = lotesCache[id];
   if (!lote) return;
   editingLoteId = id;
@@ -1331,9 +1332,17 @@ function abrirModal(id) {
   document.getElementById('f-pago').value = lote.pago || 'NAO';
   document.getElementById('btn-desfazer').style.display = (lote.status==='ARREMATADO' && currentUser && currentUser.master) ? 'flex' : 'none';
 
-  mostrarPassoArremate(1);
+  mostrarPassoArremate(passoInicial === 2 ? 2 : 1);
   document.getElementById('modal-overlay').classList.add('open');
-  setTimeout(() => document.getElementById('f-valor').focus(), 100);
+  setTimeout(() => {
+    const campo = passoInicial === 2 ? document.getElementById('f-formapgto') : document.getElementById('f-valor');
+    campo.focus();
+  }, 100);
+}
+
+// Atalho: abre o mesmo modal já direto no passo de pagamento
+function abrirModalPagamento(id) {
+  abrirModal(id, 2);
 }
 
 // ═══════════ NAVEGAÇÃO ENTRE OS 2 PASSOS DO ARREMATE ═══════════
