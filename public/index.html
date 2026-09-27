@@ -1288,7 +1288,7 @@ function renderLista() {
       <td>${l.status==='ARREMATADO' ? (l.pago==='SIM' ? '<span class="badge badge-green">✓ Pago</span>' : '<span class="badge badge-amber">Pendente</span>') : '—'}</td>
       <td>${l.status==='ARREMATADO' ? '<span class="badge badge-blue">Arrematado</span>' : '<span class="badge badge-gray">Disponível</span>'}</td>
       <td>
-        <div style="display:flex;gap:5px">
+        <div style="display:flex;gap:10px">
           <button class="btn-sm primary" onclick="abrirModal('${l.id}')" title="Registrar/editar arremate">🔨</button>
           ${l.status==='ARREMATADO' ? `<button class="btn-sm" onclick="abrirModalPagamento('${l.id}')" title="Atualizar pagamento">💳</button>` : ''}
           <button class="btn-sm" onclick="abrirModalLote('${l.id}')" title="Editar dados do lote">✏️</button>
