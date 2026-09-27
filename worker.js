@@ -171,6 +171,17 @@ async function handleApi(request, env, url) {
   }
 
   // ───────── LOTES ─────────
+  if (path === "/api/lotes/recalcular-inicial" && method === "POST") {
+    if (!auth.master) return json({ error: "sem_permissao", message: "Somente o administrador pode recalcular os lotes." }, 403);
+    const cfg = await env.DB.prepare("SELECT descontoPadrao FROM config WHERE id = 1").first();
+    const pct = parseFloat((cfg && cfg.descontoPadrao || "0").replace(",", "."));
+    if (!pct) return json({ error: "sem_desconto", message: "Nenhum desconto padrão configurado." }, 400);
+    const result = await env.DB.prepare(
+      "UPDATE lotes SET valorInicial = ROUND(valorComercial * ?, 2) WHERE valorComercial > 0"
+    ).bind(1 - pct / 100).run();
+    return json({ ok: true, afetados: result.meta.changes, percentual: pct });
+  }
+
   if (path === "/api/lotes" && method === "GET") {
     const { results } = await env.DB.prepare("SELECT * FROM lotes ORDER BY numero ASC").all();
     return json({ lotes: (results || []).map(loteFromRow) });
