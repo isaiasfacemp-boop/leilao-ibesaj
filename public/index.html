@@ -670,7 +670,7 @@
       </div>
       <div class="field">
         <label>Data do leilão</label>
-        <input type="date" id="cf-data">
+        <input type="date" id="cf-data" min="2000-01-01" max="2100-12-31" oninput="validarDataLeilao(this)">
       </div>
       <div class="field">
         <label>Ano</label>
@@ -1349,6 +1349,24 @@ function abrirModalLote(id) {
 function closeModalLote() {
   document.getElementById('modal-lote-overlay').classList.remove('open');
   editingLoteDataId = null;
+}
+
+// ═══════════ VALIDAÇÃO DA DATA DO LEILÃO (corrige ano com dígitos a mais) ═══════════
+function validarDataLeilao(el) {
+  if (!el.value) return;
+  const partes = el.value.split('-');
+  if (partes.length !== 3) return;
+  let [ano, mes, dia] = partes;
+
+  if (ano.length > 4) {
+    ano = ano.slice(0, 4); // mantém só os 4 primeiros dígitos digitados
+  }
+  const anoNum = parseInt(ano, 10);
+  if (anoNum < 2000) ano = '2000';
+  if (anoNum > 2100) ano = '2100';
+
+  const novoValor = `${ano}-${mes}-${dia}`;
+  if (novoValor !== el.value) el.value = novoValor;
 }
 
 function parseMoneyInput(str) {
