@@ -494,59 +494,69 @@
   <div class="modal">
     <div class="modal-head">
       <div>
-        <h2 id="modal-title">🔨 Arremate — Passo 1 de 2</h2>
+        <h2 id="modal-title">Registrar arremate</h2>
         <div class="modal-subtitle" id="modal-subtitle">Lote —</div>
-        <div style="display:flex;gap:6px;margin-top:10px">
-          <div style="flex:1;height:4px;border-radius:3px;background:var(--accent)" id="arremate-step-bar-1"></div>
-          <div style="flex:1;height:4px;border-radius:3px;background:var(--border)" id="arremate-step-bar-2"></div>
-        </div>
       </div>
       <button class="btn-close" onclick="closeModal()">✕</button>
     </div>
     <div class="modal-body">
       <div class="lote-preview" id="lote-preview"></div>
 
-      <div id="arremate-passo-1">
-        <div class="field">
-          <label>Valor arrematado (R$) *</label>
-          <input type="text" id="f-valor" placeholder="0,00" oninput="maskMoney(this)">
-        </div>
-        <div class="field">
-          <label>Comprador / Arrematante</label>
-          <input type="text" id="f-comprador" placeholder="Nome do comprador">
-        </div>
-        <div class="field">
-          <label>Contato</label>
-          <input type="tel" id="f-contato" inputmode="tel" placeholder="(00) 00000-0000" oninput="maskTelefone(this)">
-        </div>
+      <div class="field">
+        <label>Valor arrematado (R$) *</label>
+        <input type="text" id="f-valor" placeholder="0,00" oninput="maskMoney(this)">
       </div>
-
-      <div id="arremate-passo-2" style="display:none">
-        <div class="field">
-          <label>Forma de pagamento</label>
-          <select id="f-formapgto">
-            <option value="">— Selecione —</option>
-            <option>Dinheiro</option>
-            <option>PIX</option>
-            <option>Cartão de Débito</option>
-            <option>Cartão de Crédito</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Pagamento</label>
-          <select id="f-pago">
-            <option value="NAO">Pendente</option>
-            <option value="SIM">Pago</option>
-          </select>
-        </div>
+      <div class="field">
+        <label>Comprador / Arrematante</label>
+        <input type="text" id="f-comprador" placeholder="Nome do comprador">
+      </div>
+      <div class="field">
+        <label>Contato</label>
+        <input type="tel" id="f-contato" inputmode="tel" placeholder="(00) 00000-0000" oninput="maskTelefone(this)">
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn-outline" onclick="marcarDisponivel()" id="btn-desfazer" style="display:none">↩️ Desfazer arremate</button>
-      <button class="btn-outline" id="btn-arremate-cancelar" onclick="closeModal()">Cancelar</button>
-      <button class="btn-outline" id="btn-arremate-voltar" onclick="voltarParaArremate()" style="display:none">← Voltar</button>
-      <button class="btn" id="btn-arremate-proximo" onclick="irParaPagamento()">Próximo →</button>
-      <button class="btn" id="btn-arremate-confirmar" onclick="salvarArremate()" style="display:none">🔨 Confirmar</button>
+      <button class="btn-outline" onclick="closeModal()">Cancelar</button>
+      <button class="btn" onclick="salvarArremate()">🔨 Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DE PAGAMENTO (separado, aberto pelo ícone 💳 na lista) -->
+<div class="modal-overlay" id="modal-pagamento-overlay">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-head">
+      <div>
+        <h2>💳 Pagamento</h2>
+        <div class="modal-subtitle" id="pagamento-subtitulo">Lote —</div>
+      </div>
+      <button class="btn-close" onclick="closeModalPagamento()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="lote-preview" id="pagamento-preview"></div>
+
+      <div class="field">
+        <label>Forma de pagamento</label>
+        <select id="p-formapgto">
+          <option value="">— Selecione —</option>
+          <option>Dinheiro</option>
+          <option>PIX</option>
+          <option>Cartão de Débito</option>
+          <option>Cartão de Crédito</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Pagamento</label>
+        <select id="p-pago">
+          <option value="NAO">Pendente</option>
+          <option value="SIM">Pago</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-outline" onclick="closeModalPagamento()">Cancelar</button>
+      <button class="btn" onclick="salvarPagamento()">💳 Confirmar pagamento</button>
     </div>
   </div>
 </div>
@@ -1290,7 +1300,7 @@ function renderLista() {
       <td>
         <div style="display:flex;gap:10px">
           <button class="btn-sm primary" onclick="abrirModal('${l.id}')" title="Registrar/editar arremate">🔨</button>
-          ${l.status==='ARREMATADO' ? `<button class="btn-sm" onclick="abrirModalPagamento('${l.id}')" title="Atualizar pagamento">💳</button>` : ''}
+          <button class="btn-sm" onclick="abrirModalPagamento('${l.id}')" title="Atualizar pagamento">💳</button>
           <button class="btn-sm" onclick="abrirModalLote('${l.id}')" title="Editar dados do lote">✏️</button>
         </div>
       </td>
@@ -1311,11 +1321,12 @@ function escapeHtml(s) {
 }
 
 // ═══════════ MODAL DE ARREMATE ═══════════
-function abrirModal(id, passoInicial) {
+function abrirModal(id) {
   const lote = lotesCache[id];
   if (!lote) return;
   editingLoteId = id;
 
+  document.getElementById('modal-title').textContent = lote.status==='ARREMATADO' ? 'Editar arremate' : 'Registrar arremate';
   document.getElementById('modal-subtitle').textContent = `Lote #${lote.numero}`;
   document.getElementById('lote-preview').innerHTML = `
     <div class="nome">${escapeHtml(lote.produto)}</div>
@@ -1328,64 +1339,55 @@ function abrirModal(id, passoInicial) {
   document.getElementById('f-valor').value = lote.valorArrematado ? lote.valorArrematado.toFixed(2).replace('.',',') : '';
   document.getElementById('f-comprador').value = lote.comprador || '';
   document.getElementById('f-contato').value = lote.contato || '';
-  document.getElementById('f-formapgto').value = lote.formaPgto || '';
-  document.getElementById('f-pago').value = lote.pago || 'NAO';
   document.getElementById('btn-desfazer').style.display = (lote.status==='ARREMATADO' && currentUser && currentUser.master) ? 'flex' : 'none';
 
-  mostrarPassoArremate(passoInicial === 2 ? 2 : 1);
   document.getElementById('modal-overlay').classList.add('open');
-  setTimeout(() => {
-    const campo = passoInicial === 2 ? document.getElementById('f-formapgto') : document.getElementById('f-valor');
-    campo.focus();
-  }, 100);
+  setTimeout(() => document.getElementById('f-valor').focus(), 100);
 }
 
-// Atalho: abre o mesmo modal já direto no passo de pagamento
+// ═══════════ MODAL DE PAGAMENTO (separado, ícone 💳 na lista) ═══════════
+let editingPagamentoId = null;
+
 function abrirModalPagamento(id) {
-  abrirModal(id, 2);
+  const lote = lotesCache[id];
+  if (!lote) return;
+  editingPagamentoId = id;
+
+  document.getElementById('pagamento-subtitulo').textContent = `Lote #${lote.numero}`;
+  document.getElementById('pagamento-preview').innerHTML = `
+    <div class="nome">${escapeHtml(lote.produto)}</div>
+    <div class="valores">
+      <span>Arrematado por: <b>${escapeHtml(lote.comprador||'—')}</b></span>
+      <span>Valor: <b>${fmtMoney(lote.valorArrematado)}</b></span>
+    </div>`;
+
+  document.getElementById('p-formapgto').value = lote.formaPgto || '';
+  document.getElementById('p-pago').value = lote.pago || 'NAO';
+
+  document.getElementById('modal-pagamento-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('p-formapgto').focus(), 100);
 }
 
-// ═══════════ NAVEGAÇÃO ENTRE OS 2 PASSOS DO ARREMATE ═══════════
-function mostrarPassoArremate(passo) {
-  const p1 = document.getElementById('arremate-passo-1');
-  const p2 = document.getElementById('arremate-passo-2');
-  const barra1 = document.getElementById('arremate-step-bar-1');
-  const barra2 = document.getElementById('arremate-step-bar-2');
-  const titulo = document.getElementById('modal-title');
+function closeModalPagamento() {
+  document.getElementById('modal-pagamento-overlay').classList.remove('open');
+  editingPagamentoId = null;
+}
 
-  if (passo === 1) {
-    p1.style.display = 'block';
-    p2.style.display = 'none';
-    barra1.style.background = 'var(--accent)';
-    barra2.style.background = 'var(--border)';
-    titulo.textContent = '🔨 Arremate — Passo 1 de 2';
-    document.getElementById('btn-arremate-cancelar').style.display = 'flex';
-    document.getElementById('btn-arremate-voltar').style.display = 'none';
-    document.getElementById('btn-arremate-proximo').style.display = 'flex';
-    document.getElementById('btn-arremate-confirmar').style.display = 'none';
-  } else {
-    p1.style.display = 'none';
-    p2.style.display = 'block';
-    barra1.style.background = 'var(--accent)';
-    barra2.style.background = 'var(--accent)';
-    titulo.textContent = '💳 Pagamento — Passo 2 de 2';
-    document.getElementById('btn-arremate-cancelar').style.display = 'none';
-    document.getElementById('btn-arremate-voltar').style.display = 'flex';
-    document.getElementById('btn-arremate-proximo').style.display = 'none';
-    document.getElementById('btn-arremate-confirmar').style.display = 'flex';
+async function salvarPagamento() {
+  if (!editingPagamentoId) return;
+  const payload = {
+    formaPgto: document.getElementById('p-formapgto').value,
+    pago: document.getElementById('p-pago').value,
+  };
+  try {
+    await api('/lotes/' + editingPagamentoId, { method: 'PUT', body: JSON.stringify(payload) });
+    Object.assign(lotesCache[editingPagamentoId], payload);
+    renderAll();
+    showToast('✅','Pagamento atualizado!','success');
+    closeModalPagamento();
+  } catch(e) {
+    showToast('❌', e.message || 'Erro ao salvar.', 'error');
   }
-}
-
-function irParaPagamento() {
-  const valorStr = document.getElementById('f-valor').value.trim();
-  if (!valorStr) { showToast('⚠️','Informe o valor arrematado.',''); return; }
-  const valor = parseFloat(valorStr.replace(/\./g,'').replace(',','.'));
-  if (isNaN(valor) || valor <= 0) { showToast('⚠️','Valor inválido.',''); return; }
-  mostrarPassoArremate(2);
-}
-
-function voltarParaArremate() {
-  mostrarPassoArremate(1);
 }
 
 function closeModal() {
@@ -1404,8 +1406,6 @@ async function salvarArremate() {
     valorArrematado: valor,
     comprador: document.getElementById('f-comprador').value.trim(),
     contato: document.getElementById('f-contato').value.trim(),
-    formaPgto: document.getElementById('f-formapgto').value,
-    pago: document.getElementById('f-pago').value,
     status: 'ARREMATADO',
   };
 
@@ -2137,19 +2137,20 @@ function showToast(icon, msg, type) {
 }
 
 document.addEventListener('keydown', e => {
-  if (e.key==='Escape') { closeModal(); closeModalLote(); closeModalNovo(); closeModalConfig(); closeModalUsuario(); fecharCamera(); }
+  if (e.key==='Escape') { closeModal(); closeModalPagamento(); closeModalLote(); closeModalNovo(); closeModalConfig(); closeModalUsuario(); fecharCamera(); }
 });
 
 // ═══════════ ENTER FUNCIONA COMO TAB ═══════════
 const ACAO_PRINCIPAL_POR_MODAL = {
   'modal-overlay': 'salvarArremate',
+  'modal-pagamento-overlay': 'salvarPagamento',
   'modal-lote-overlay': 'salvarLoteEditado',
   'modal-novo-overlay': 'salvarLoteNovo',
   'modal-config-overlay': 'salvarConfig',
   'modal-usuario-overlay': 'salvarUsuario',
 };
 
-const FUNCOES_ACAO = { salvarArremate, salvarLoteEditado, salvarLoteNovo, salvarConfig, salvarUsuario, doLogin, doSetup };
+const FUNCOES_ACAO = { salvarArremate, salvarPagamento, salvarLoteEditado, salvarLoteNovo, salvarConfig, salvarUsuario, doLogin, doSetup };
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
@@ -2179,10 +2180,6 @@ document.addEventListener('keydown', e => {
   if (idx < campos.length - 1) {
     campos[idx + 1].focus();
     if (campos[idx + 1].select) campos[idx + 1].select();
-  } else if (modal.id === 'modal-overlay') {
-    // Modal de arremate tem 2 passos: no último campo visível, avança ou confirma
-    const passo2Visivel = document.getElementById('arremate-passo-2').style.display !== 'none';
-    if (passo2Visivel) salvarArremate(); else irParaPagamento();
   } else {
     const nomeAcao = ACAO_PRINCIPAL_POR_MODAL[modal.id];
     if (nomeAcao && FUNCOES_ACAO[nomeAcao]) FUNCOES_ACAO[nomeAcao]();
