@@ -751,7 +751,8 @@
 let lotesCache = {};   // id -> lote
 let usersCache = [];
 let currentUser = null; // {username, master}
-let authToken = localStorage.getItem('leilao_token') || null;
+localStorage.removeItem('leilao_token'); // limpa sessões antigas guardadas antes desta mudança
+let authToken = null; // nunca persiste — sempre pede login ao abrir
 let editingLoteId = null;
 let editingLoteDataId = null;
 let pollInterval = null;
@@ -765,7 +766,6 @@ async function api(path, options = {}) {
   try { data = await resp.json(); } catch(e) {}
   if (resp.status === 401) {
     authToken = null;
-    localStorage.removeItem('leilao_token');
     showAuthOverlay();
     throw Object.assign(new Error('nao_autenticado'), { status: 401, data });
   }
@@ -827,8 +827,7 @@ async function doSetup() {
 
   try {
     const result = await api('/setup', { method: 'POST', body: JSON.stringify({ username, password }) });
-    authToken = result.token;
-    localStorage.setItem('leilao_token', authToken);
+    authToken = result.token; // fica só na memória desta aba — não persiste
     currentUser = result.user;
     await entrarNoSistema();
   } catch(e) {
@@ -851,8 +850,7 @@ async function doLogin() {
 
   try {
     const result = await api('/login', { method: 'POST', body: JSON.stringify({ username, password }) });
-    authToken = result.token;
-    localStorage.setItem('leilao_token', authToken);
+    authToken = result.token; // fica só na memória desta aba — não persiste
     currentUser = result.user;
     await entrarNoSistema();
   } catch(e) {
@@ -865,7 +863,6 @@ async function doLogout() {
   if (!confirm('Deseja sair do sistema?')) return;
   try { await api('/logout', { method: 'POST' }); } catch(e) {}
   authToken = null;
-  localStorage.removeItem('leilao_token');
   currentUser = null;
   if (pollInterval) clearInterval(pollInterval);
   document.getElementById('login-username').value = '';
