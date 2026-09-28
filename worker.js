@@ -196,11 +196,8 @@ async function handleApi(request, env, url) {
     const existente = await env.DB.prepare("SELECT id FROM lotes WHERE numero = ?").bind(numero).first();
     if (existente) return json({ error: "numero_existe", message: `O lote nº ${numero} já existe.` }, 409);
 
+    // Código de barras e nome do produto podem se repetir (vários itens iguais no leilão)
     const codigoBarras = str(body.codigoBarras, 60);
-    if (codigoBarras) {
-      const codConflito = await env.DB.prepare("SELECT numero FROM lotes WHERE codigoBarras = ? AND codigoBarras != ''").bind(codigoBarras).first();
-      if (codConflito) return json({ error: "codigo_existe", message: `Código já usado no lote nº ${codConflito.numero}.` }, 409);
-    }
 
     const id = newId();
     await env.DB.prepare(
@@ -222,17 +219,13 @@ async function handleApi(request, env, url) {
 
     const body = await readJson(request, 3000000);
 
-    // Se está mudando número ou código de barras, valida duplicidade
+    // Só o número do lote precisa ser único; código de barras e nome podem repetir
     if (body.numero !== undefined) {
       const novoNumero = parseInt(body.numero, 10);
       if (novoNumero !== target.numero) {
         const conflito = await env.DB.prepare("SELECT id FROM lotes WHERE numero = ? AND id != ?").bind(novoNumero, id).first();
         if (conflito) return json({ error: "numero_existe", message: `O lote nº ${novoNumero} já existe.` }, 409);
       }
-    }
-    if (body.codigoBarras !== undefined && body.codigoBarras) {
-      const conflito = await env.DB.prepare("SELECT numero FROM lotes WHERE codigoBarras = ? AND id != ? AND codigoBarras != ''").bind(body.codigoBarras, id).first();
-      if (conflito) return json({ error: "codigo_existe", message: `Código já usado no lote nº ${conflito.numero}.` }, 409);
     }
 
     // Monta update dinâmico apenas com os campos enviados
