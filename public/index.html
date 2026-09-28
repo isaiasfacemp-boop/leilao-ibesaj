@@ -414,7 +414,7 @@
     <div class="scanner-box">
       <label>🔍 Busca / leitor de código de barras — digite nº do lote, código de barras, produto ou doador</label>
       <div class="scanner-row">
-        <input type="text" class="search-box" id="lista-search" placeholder="Digite ou leia um código…" oninput="renderLista()" autofocus>
+        <input type="text" class="search-box" id="lista-search" placeholder="Digite ou leia um código…" oninput="upperCaseInput(this); renderLista()" autofocus>
         <button class="btn-cam" onclick="abrirCamera()" title="Ler código de barras pela câmera">📷 Câmera</button>
       </div>
       <div id="scanner-status" class="scan-status"></div>
@@ -508,7 +508,7 @@
       </div>
       <div class="field">
         <label>Comprador / Arrematante</label>
-        <input type="text" id="f-comprador" placeholder="Nome do comprador">
+        <input type="text" id="f-comprador" placeholder="Nome do comprador" oninput="upperCaseInput(this)">
       </div>
       <div class="field">
         <label>Contato</label>
@@ -605,11 +605,11 @@
       </div>
       <div class="field">
         <label>Produto *</label>
-        <input type="text" id="lf-produto" placeholder="Nome do produto">
+        <input type="text" id="lf-produto" placeholder="Nome do produto" oninput="upperCaseInput(this)">
       </div>
       <div class="field">
         <label>Doador / Estabelecimento</label>
-        <input type="text" id="lf-estabelecimento" placeholder="Quem doou o item">
+        <input type="text" id="lf-estabelecimento" placeholder="Quem doou o item" oninput="upperCaseInput(this)">
       </div>
       <div class="field">
         <label>Valor comercial (R$)</label>
@@ -673,11 +673,11 @@
       </div>
       <div class="field">
         <label>Produto *</label>
-        <input type="text" id="nf-produto" placeholder="Nome do produto">
+        <input type="text" id="nf-produto" placeholder="Nome do produto" oninput="upperCaseInput(this)">
       </div>
       <div class="field">
         <label>Doador / Estabelecimento</label>
-        <input type="text" id="nf-estabelecimento" placeholder="Quem doou o item">
+        <input type="text" id="nf-estabelecimento" placeholder="Quem doou o item" oninput="upperCaseInput(this)">
       </div>
       <div class="field">
         <label>Valor comercial (R$)</label>
@@ -709,11 +709,11 @@
     <div class="modal-body">
       <div class="field">
         <label>Nome do leilão *</label>
-        <input type="text" id="cf-nome" placeholder="Ex.: Leilão Beneficente">
+        <input type="text" id="cf-nome" placeholder="Ex.: Leilão Beneficente" oninput="upperCaseInput(this)">
       </div>
       <div class="field">
         <label>Edição (nº/ordinal) — opcional</label>
-        <input type="text" id="cf-edicao" placeholder="Ex.: VII, 7ª, 2ª edição…">
+        <input type="text" id="cf-edicao" placeholder="Ex.: VII, 7ª, 2ª edição…" oninput="upperCaseInput(this)">
       </div>
       <div class="field">
         <label>Data do leilão</label>
@@ -1611,7 +1611,7 @@ function abrirModalNovo() {
   document.getElementById('nf-pct-inicial-hint').textContent = '';
   removePhoto('nf');
   document.getElementById('modal-novo-overlay').classList.add('open');
-  setTimeout(() => document.getElementById('nf-produto').focus(), 100);
+  setTimeout(() => document.getElementById('nf-codigobarras').focus(), 100);
 }
 
 function closeModalNovo() {
@@ -1693,6 +1693,13 @@ function removePhoto(prefix) {
   document.getElementById(prefix + '-photo-img').src = '';
   document.getElementById(prefix + '-photo-preview').classList.remove('has-photo');
   document.getElementById(prefix + '-btn-remove-photo').style.display = 'none';
+}
+
+// ═══════════ CAIXA ALTA AUTOMÁTICA (campos de texto livre, exceto usuário/senha) ═══════════
+function upperCaseInput(el) {
+  const pos = el.selectionStart;
+  el.value = el.value.toUpperCase();
+  el.setSelectionRange(pos, pos);
 }
 
 function maskTelefone(el) {
@@ -1853,7 +1860,7 @@ async function abrirCamera(destino) {
 }
 
 function startNativeDetector(video, statusEl, detectedEl) {
-  const detector = new BarcodeDetector({ formats: ['ean_13','ean_8','upc_a','upc_e','code_128','code_39','qr_code','itf','codabar'] });
+  const detector = new BarcodeDetector({ formats: ['ean_13','ean_8','code_128','code_39','qr_code','itf','codabar'] });
   nativeDetectorInterval = setInterval(async () => {
     try {
       const codigos = await detector.detect(video);
@@ -1866,6 +1873,11 @@ function startZXing(video, statusEl, detectedEl) {
   try {
     const hints = new Map();
     hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+      ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
+      ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
+      ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.ITF, ZXing.BarcodeFormat.CODABAR,
+    ]);
     zxingReader = new ZXing.BrowserMultiFormatReader(hints);
     zxingReader.decodeFromVideoElement(video, (result) => {
       if (result) onCodigoDetectado(result.getText(), statusEl, detectedEl);
