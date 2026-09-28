@@ -411,7 +411,7 @@
       <button class="btn-outline no-print" style="font-size:12px;padding:7px 12px" onclick="imprimirRecebimentos()">🖨️ Imprimir relatório</button>
     </div>
     <div class="stat-card" style="margin-bottom:20px">
-      <div id="chart-pagamentos" class="chart-wrap"></div>
+      <div id="chart-pagamentos" class="chart-wrap" style="max-width:520px"></div>
       <div id="lista-pagamentos" style="margin-top:14px"></div>
     </div>
 
@@ -1294,19 +1294,19 @@ function renderChartPagamentos() {
 
   const categorias = Object.keys(porCategoria).filter(cat => cat !== 'Não informado' || porCategoria[cat] > 0);
   const max = Math.max(...categorias.map(c => porCategoria[c]), 1);
-  const w = 420, h = categorias.length * 38 + 6, barH = 20, gap = 18, padLeft = 10, padRight = 120;
+  const w = 420, h = categorias.length * 60 + 10, barH = 34, gap = 26, padLeft = 10, padRight = 130;
   const escala = (w - padLeft - padRight);
 
   let svg = `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, sans-serif">`;
   categorias.forEach((cat, i) => {
     const valor = porCategoria[cat];
-    const y = i * (barH + gap) + 16;
+    const y = i * (barH + gap) + 22;
     const largura = Math.max((valor / max) * escala, 2);
     svg += `
-      <text x="${padLeft}" y="${y - 5}" font-size="11" fill="var(--text2)" font-weight="600">${cat}</text>
-      <rect x="${padLeft}" y="${y}" width="${escala}" height="${barH}" rx="5" fill="var(--surface2)"></rect>
-      <rect x="${padLeft}" y="${y}" width="${largura}" height="${barH}" rx="5" fill="${cores[cat]}"></rect>
-      <text x="${padLeft + escala + 8}" y="${y + barH/2}" font-size="10.5" font-weight="800" fill="var(--text)" dominant-baseline="middle">${fmtMoney(valor)}</text>
+      <text x="${padLeft}" y="${y - 8}" font-size="12" fill="var(--text2)" font-weight="600">${cat}</text>
+      <rect x="${padLeft}" y="${y}" width="${escala}" height="${barH}" rx="6" fill="var(--surface2)"></rect>
+      <rect x="${padLeft}" y="${y}" width="${largura}" height="${barH}" rx="6" fill="${cores[cat]}"></rect>
+      <text x="${padLeft + escala + 8}" y="${y + barH/2}" font-size="11" font-weight="800" fill="var(--text)" dominant-baseline="middle">${fmtMoney(valor)}</text>
     `;
   });
   svg += `</svg>`;
