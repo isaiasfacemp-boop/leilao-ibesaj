@@ -31,7 +31,7 @@
     --on-accent:#ffffff;
   }
   *,*::before,*::after{box-sizing:inherit;margin:0;padding:0}
-  html,body{height:100%}
+  html,body{height:100%;overscroll-behavior-y:contain}
   body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100dvh;display:flex;flex-direction:column}
 
   header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;gap:12px;flex-wrap:wrap}
@@ -218,6 +218,8 @@
   .print-card.cartao .campo{border:1px solid #999;border-radius:4px;padding:12px;margin-top:6px;min-height:44px;font-size:13px;color:#aaa;text-align:left}
   .print-card.cartao .campo-label{font-weight:700;color:#666;font-size:9px;margin-top:8px;text-align:left}
 
+  .only-print { display:none; }
+
   @media print {
     header, .print-controls, .toolbar, footer, .no-print, .scanner-box { display:none !important; }
     body { background:#fff; color:#000; }
@@ -226,23 +228,28 @@
     .print-card { border-color:#333; }
 
     .print-lista-titulo { display:block !important; }
+    .only-print { display:table !important; }
 
-    .view#view-lista { display:block !important; }
     .table-section { border:none !important; background:#fff !important; }
     table { width:100%; border-collapse:collapse; }
     th, td { color:#000 !important; border-bottom:1px solid #ccc !important; background:#fff !important; padding:6px 8px !important; font-size:11px !important; }
     th { background:#f0f0f0 !important; }
     tr:hover td { background:#fff !important; }
-    table th:last-child, table td:last-child { display:none; } /* coluna Ações */
-    table th:nth-child(2), table td:nth-child(2),
-    table th:nth-child(8), table td:nth-child(8),
-    table th:nth-child(10), table td:nth-child(10) { display:none; } /* Cód. Barras, %, Pgto */
+    #lista-tabela th:last-child, #lista-tabela td:last-child { display:none; } /* coluna Ações */
+    #lista-tabela th:nth-child(2), #lista-tabela td:nth-child(2),
+    #lista-tabela th:nth-child(8), #lista-tabela td:nth-child(8),
+    #lista-tabela th:nth-child(10), #lista-tabela td:nth-child(10) { display:none; } /* Cód. Barras, %, Pgto */
     .table-photo, .table-photo-placeholder { display:none; }
     .produto-cell { display:block; }
     .badge { border:1px solid #999 !important; background:#fff !important; color:#000 !important; padding:2px 6px; }
     .valor-comercial { color:#666 !important; }
     .valor-arrematado { color:#000 !important; }
     .empty-state { display:none !important; }
+
+    /* Ao imprimir o relatório de recebimentos, esconde o resto do dashboard */
+    body.imprimindo-pagamentos #dashboard-normal { display:none !important; }
+    /* Ao imprimir a lista de lotes, esconde a tabela de recebimentos se estiver na mesma view */
+    body.imprimindo-lista #print-pagamentos-tabela, body.imprimindo-lista #print-pagamentos-titulo { display:none !important; }
   }
 
   .toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 18px;font-size:14px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow);z-index:500;transform:translateY(80px);opacity:0;transition:all .25s ease;max-width:320px}
@@ -359,6 +366,7 @@
 
   <!-- ═══════════ DASHBOARD ═══════════ -->
   <div class="view active" id="view-dashboard">
+    <div id="dashboard-normal">
     <div class="stats-grid">
       <div class="stat-card">
         <div class="label">Valor de mercado</div>
@@ -398,15 +406,32 @@
       </div>
     </div>
 
+    <div class="section-title" style="justify-content:space-between">
+      <span>💵 Relatório de recebimentos <span style="font-size:12px;font-weight:500;color:var(--text2)">(pagamentos confirmados)</span></span>
+      <button class="btn-outline no-print" style="font-size:12px;padding:7px 12px" onclick="imprimirRecebimentos()">🖨️ Imprimir relatório</button>
+    </div>
+    <div class="stat-card" style="margin-bottom:20px">
+      <div id="chart-pagamentos" class="chart-wrap"></div>
+      <div id="lista-pagamentos" style="margin-top:14px"></div>
+    </div>
+
     <div class="section-title">🏆 Últimos arremates</div>
     <div class="top-list" id="d-recentes">
       <div class="empty-state"><div class="icon">🔨</div>Nenhum arremate ainda</div>
     </div>
 
-    <div class="section-title">💰 Maiores lances</div>
+    <div class="section-title">💰 Maiores lances <span style="font-size:12px;font-weight:500;color:var(--text2)">(acima de 50%)</span></div>
     <div class="top-list" id="d-maiores">
       <div class="empty-state"><div class="icon">💰</div>Nenhum arremate ainda</div>
     </div>
+    </div>
+
+    <div class="print-lista-titulo" id="print-pagamentos-titulo" style="display:none;text-align:center;margin-bottom:14px">
+      <h2 id="print-pagamentos-nome" style="margin:0;font-size:18px">Leilão</h2>
+      <p id="print-pagamentos-data" style="margin:4px 0 0;font-size:11px;color:#666">Relatório de recebimentos</p>
+    </div>
+    <table class="only-print" id="print-pagamentos-tabela" style="width:100%;border-collapse:collapse;font-size:12px">
+    </table>
   </div>
 
   <!-- ═══════════ LISTA DE LOTES ═══════════ -->
@@ -433,13 +458,13 @@
       <button class="btn" onclick="abrirModalNovo()">➕ Novo Lote</button>
       <button class="btn-outline no-print" onclick="imprimirLista()">🖨️ Imprimir lista</button>
     </div>
-    <div class="print-lista-titulo" style="display:none;text-align:center;margin-bottom:14px">
+    <div class="print-lista-titulo" id="print-lista-titulo" style="display:none;text-align:center;margin-bottom:14px">
       <h2 id="print-lista-nome" style="margin:0;font-size:18px">Leilão</h2>
       <p id="print-lista-data" style="margin:4px 0 0;font-size:11px;color:#666">Lista de lotes</p>
     </div>
     <div class="table-section">
       <div class="table-wrap">
-        <table>
+        <table id="lista-tabela">
           <thead>
             <tr>
               <th>Nº</th><th>Cód. Barras</th><th>Produto</th><th>Doador</th><th>Comercial</th>
@@ -1162,7 +1187,7 @@ function renderDashboard() {
   const comPct = arrematados
     .filter(l => l.valorComercial)
     .map(l => ({ lote: l, pct: ((l.valorArrematado - l.valorComercial) / l.valorComercial) * 100 }));
-  const maiores = comPct.sort((a,b) => b.pct - a.pct).slice(0,8);
+  const maiores = comPct.filter(x => x.pct > 50).sort((a,b) => b.pct - a.pct);
   document.getElementById('d-maiores').innerHTML = maiores.length ? maiores.map(({lote:l, pct}) => `
     <div class="top-item">
       <span class="num">#${l.numero}</span>
@@ -1174,10 +1199,11 @@ function renderDashboard() {
         <span class="valor">${fmtMoney(l.valorArrematado)}</span>
         <div>${calcularBadgePercentual(l)}</div>
       </div>
-    </div>`).join('') : '<div class="empty-state"><div class="icon">💰</div>Nenhum arremate ainda</div>';
+    </div>`).join('') : '<div class="empty-state"><div class="icon">💰</div>Nenhum lance acima de 50% ainda</div>';
 
   renderChartValores(valorMercado, valorArrematado);
   renderChartLotes(total - arrematados.length, arrematados.length);
+  renderChartPagamentos();
 }
 
 // ═══════════ GRÁFICOS (SVG puro) ═══════════
@@ -1236,6 +1262,69 @@ function renderChartLotes(disponiveis, arrematados) {
   el.innerHTML = svg + `<div class="chart-legend">
     <div class="chart-legend-item"><span class="chart-legend-dot" style="background:var(--text3)"></span>${total} lotes no total</div>
   </div>`;
+}
+
+// ═══════════ RELATÓRIO DE RECEBIMENTOS POR FORMA DE PAGAMENTO ═══════════
+function categoriaFormaPgto(forma) {
+  if (forma === 'Cartão de Débito' || forma === 'Cartão de Crédito') return 'Cartão';
+  if (forma === 'Dinheiro') return 'Dinheiro';
+  if (forma === 'PIX') return 'PIX';
+  return 'Não informado';
+}
+
+function calcularRecebimentos() {
+  const pagos = Object.values(lotesCache).filter(l => l.pago === 'SIM' && l.valorArrematado);
+  const porCategoria = { 'Cartão': 0, 'Dinheiro': 0, 'PIX': 0, 'Não informado': 0 };
+  const qtdPorCategoria = { 'Cartão': 0, 'Dinheiro': 0, 'PIX': 0, 'Não informado': 0 };
+  pagos.forEach(l => {
+    const cat = categoriaFormaPgto(l.formaPgto);
+    porCategoria[cat] += l.valorArrematado;
+    qtdPorCategoria[cat] += 1;
+  });
+  return { porCategoria, qtdPorCategoria, total: pagos.reduce((s,l) => s + l.valorArrematado, 0), qtdTotal: pagos.length };
+}
+
+function renderChartPagamentos() {
+  const elChart = document.getElementById('chart-pagamentos');
+  const elLista = document.getElementById('lista-pagamentos');
+  if (!elChart || !elLista) return;
+
+  const { porCategoria, qtdPorCategoria, total, qtdTotal } = calcularRecebimentos();
+  const cores = { 'Cartão': 'var(--blue)', 'Dinheiro': 'var(--green)', 'PIX': 'var(--accent)', 'Não informado': 'var(--text3)' };
+
+  const categorias = Object.keys(porCategoria).filter(cat => cat !== 'Não informado' || porCategoria[cat] > 0);
+  const max = Math.max(...categorias.map(c => porCategoria[c]), 1);
+  const w = 420, h = categorias.length * 38 + 6, barH = 20, gap = 18, padLeft = 10, padRight = 120;
+  const escala = (w - padLeft - padRight);
+
+  let svg = `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, sans-serif">`;
+  categorias.forEach((cat, i) => {
+    const valor = porCategoria[cat];
+    const y = i * (barH + gap) + 16;
+    const largura = Math.max((valor / max) * escala, 2);
+    svg += `
+      <text x="${padLeft}" y="${y - 5}" font-size="11" fill="var(--text2)" font-weight="600">${cat}</text>
+      <rect x="${padLeft}" y="${y}" width="${escala}" height="${barH}" rx="5" fill="var(--surface2)"></rect>
+      <rect x="${padLeft}" y="${y}" width="${largura}" height="${barH}" rx="5" fill="${cores[cat]}"></rect>
+      <text x="${padLeft + escala + 8}" y="${y + barH/2}" font-size="10.5" font-weight="800" fill="var(--text)" dominant-baseline="middle">${fmtMoney(valor)}</text>
+    `;
+  });
+  svg += `</svg>`;
+  elChart.innerHTML = svg;
+
+  elLista.innerHTML = categorias.map(cat => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)">
+        <span class="chart-legend-dot" style="background:${cores[cat]}"></span>${cat} — ${qtdPorCategoria[cat]} lote${qtdPorCategoria[cat]!==1?'s':''}
+      </span>
+      <span style="font-weight:700;color:var(--text)">${fmtMoney(porCategoria[cat])}</span>
+    </div>
+  `).join('') + `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;margin-top:6px">
+      <span style="font-size:13px;font-weight:700;color:var(--text)">Total recebido — ${qtdTotal} lote${qtdTotal!==1?'s':''}</span>
+      <span style="font-weight:800;font-size:16px;color:var(--green)">${fmtMoney(total)}</span>
+    </div>
+  `;
 }
 
 // ═══════════ LISTA ═══════════
@@ -1904,6 +1993,7 @@ function onCodigoDetectado(codigo, statusEl, detectedEl) {
       const hint = document.getElementById(cameraDestino + '-codigo-hint');
       if (hint) { hint.style.color = 'var(--text3)'; hint.textContent = ''; }
       showToast('✅','Código lido: ' + codigo, 'success');
+      buscarProdutoPorCodigo(cameraDestino); // busca o produto sozinho, sem precisar clicar em Buscar
     } else {
       const existente = Object.entries(lotesCache).find(([id,l]) => l.codigoBarras === codigo);
       if (existente) {
@@ -1943,9 +2033,52 @@ function imprimirLista() {
   const agora = new Date().toLocaleDateString('pt-BR');
   document.getElementById('print-lista-nome').textContent = titulo;
   document.getElementById('print-lista-data').textContent = `Lista de lotes — gerado em ${agora}`;
-  document.querySelector('.print-lista-titulo').style.display = 'block';
+  document.getElementById('print-lista-titulo').style.display = 'block';
+  document.body.classList.add('imprimindo-lista');
   window.print();
 }
+
+function imprimirRecebimentos() {
+  const titulo = document.getElementById('leilao-titulo').textContent;
+  const agora = new Date().toLocaleDateString('pt-BR');
+  document.getElementById('print-pagamentos-nome').textContent = titulo;
+  document.getElementById('print-pagamentos-data').textContent = `Relatório de recebimentos — gerado em ${agora}`;
+  document.getElementById('print-pagamentos-titulo').style.display = 'block';
+
+  const { porCategoria, qtdPorCategoria, total, qtdTotal } = calcularRecebimentos();
+  const categorias = Object.keys(porCategoria).filter(cat => cat !== 'Não informado' || porCategoria[cat] > 0);
+
+  const linhas = categorias.map(cat => `
+    <tr>
+      <td style="padding:8px;border-bottom:1px solid #ddd">${cat}</td>
+      <td style="padding:8px;border-bottom:1px solid #ddd;text-align:center">${qtdPorCategoria[cat]}</td>
+      <td style="padding:8px;border-bottom:1px solid #ddd;text-align:right">${fmtMoney(porCategoria[cat])}</td>
+    </tr>`).join('');
+
+  document.getElementById('print-pagamentos-tabela').innerHTML = `
+    <thead>
+      <tr>
+        <th style="text-align:left;padding:8px;border-bottom:2px solid #999">Forma de pagamento</th>
+        <th style="text-align:center;padding:8px;border-bottom:2px solid #999">Lotes</th>
+        <th style="text-align:right;padding:8px;border-bottom:2px solid #999">Valor recebido</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${linhas}
+      <tr>
+        <td style="padding:10px 8px;font-weight:800">Total</td>
+        <td style="padding:10px 8px;text-align:center;font-weight:800">${qtdTotal}</td>
+        <td style="padding:10px 8px;text-align:right;font-weight:800">${fmtMoney(total)}</td>
+      </tr>
+    </tbody>`;
+
+  document.body.classList.add('imprimindo-pagamentos');
+  window.print();
+}
+
+window.addEventListener('afterprint', () => {
+  document.body.classList.remove('imprimindo-lista', 'imprimindo-pagamentos');
+});
 
 function renderEtiquetas() {
   const lotes = Object.values(lotesCache).sort((a,b)=>a.numero-b.numero);
