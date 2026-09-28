@@ -403,7 +403,7 @@
       <div class="empty-state"><div class="icon">🔨</div>Nenhum arremate ainda</div>
     </div>
 
-    <div class="section-title">💰 Maiores lances</div>
+    <div class="section-title">💰 Maiores lances <span style="font-size:12px;font-weight:500;color:var(--text2)">(acima de 50%)</span></div>
     <div class="top-list" id="d-maiores">
       <div class="empty-state"><div class="icon">💰</div>Nenhum arremate ainda</div>
     </div>
@@ -1162,7 +1162,7 @@ function renderDashboard() {
   const comPct = arrematados
     .filter(l => l.valorComercial)
     .map(l => ({ lote: l, pct: ((l.valorArrematado - l.valorComercial) / l.valorComercial) * 100 }));
-  const maiores = comPct.sort((a,b) => b.pct - a.pct).slice(0,8);
+  const maiores = comPct.filter(x => x.pct > 50).sort((a,b) => b.pct - a.pct);
   document.getElementById('d-maiores').innerHTML = maiores.length ? maiores.map(({lote:l, pct}) => `
     <div class="top-item">
       <span class="num">#${l.numero}</span>
@@ -1174,7 +1174,7 @@ function renderDashboard() {
         <span class="valor">${fmtMoney(l.valorArrematado)}</span>
         <div>${calcularBadgePercentual(l)}</div>
       </div>
-    </div>`).join('') : '<div class="empty-state"><div class="icon">💰</div>Nenhum arremate ainda</div>';
+    </div>`).join('') : '<div class="empty-state"><div class="icon">💰</div>Nenhum lance acima de 50% ainda</div>';
 
   renderChartValores(valorMercado, valorArrematado);
   renderChartLotes(total - arrematados.length, arrematados.length);
