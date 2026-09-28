@@ -412,9 +412,9 @@
       <span>💵 Relatório de recebimentos <span style="font-size:12px;font-weight:500;color:var(--text2)">(pagamentos confirmados)</span></span>
       <button class="btn-outline no-print" style="font-size:12px;padding:7px 12px" onclick="imprimirRecebimentos()">🖨️ Imprimir relatório</button>
     </div>
-    <div class="stat-card" style="margin-bottom:20px;max-width:520px">
-      <div id="chart-pagamentos" class="chart-wrap"></div>
-      <div id="lista-pagamentos" style="margin-top:14px"></div>
+    <div class="stat-card" style="margin-bottom:20px;display:flex;gap:56px;flex-wrap:wrap;align-items:flex-start">
+      <div id="chart-pagamentos" class="chart-wrap" style="flex:1 1 420px;max-width:480px"></div>
+      <div id="lista-pagamentos" style="flex:1 1 280px;min-width:0;align-self:center"></div>
     </div>
 
     <div class="section-title">🏆 Últimos arremates</div>
@@ -1292,7 +1292,7 @@ function renderChartPagamentos() {
   if (!elChart || !elLista) return;
 
   const { porCategoria, qtdPorCategoria, total, qtdTotal } = calcularRecebimentos();
-  const cores = { 'Cartão': 'var(--blue)', 'Dinheiro': 'var(--green)', 'PIX': 'var(--accent)', 'Não informado': 'var(--text3)' };
+  const cores = { 'Cartão': 'var(--blue)', 'Dinheiro': 'var(--green)', 'PIX': '#f97316', 'Não informado': 'var(--text3)' };
 
   const categorias = Object.keys(porCategoria).filter(cat => cat !== 'Não informado' || porCategoria[cat] > 0);
   const w = 420, h = categorias.length * 60 + 10, barH = 34, gap = 26, padLeft = 10, padRight = 112;
@@ -1312,9 +1312,7 @@ function renderChartPagamentos() {
     `;
   });
   svg += `</svg>`;
-  elChart.innerHTML = svg + `<div class="chart-legend">
-    <div class="chart-legend-item"><span class="chart-legend-dot" style="background:var(--green)"></span>${qtdTotal} pagamento${qtdTotal!==1?'s':''} recebido${qtdTotal!==1?'s':''} — ${fmtMoney(total)}</div>
-  </div>`;
+  elChart.innerHTML = svg;
 
   elLista.innerHTML = categorias.map(cat => `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
@@ -1326,7 +1324,7 @@ function renderChartPagamentos() {
   `).join('') + `
     <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;margin-top:6px">
       <span style="font-size:13px;font-weight:700;color:var(--text)">Total recebido — ${qtdTotal} lote${qtdTotal!==1?'s':''}</span>
-      <span style="font-weight:800;font-size:16px;color:var(--green)">${fmtMoney(total)}</span>
+      <span style="font-weight:800;font-size:14px;color:var(--green)">${fmtMoney(total)}</span>
     </div>
   `;
 }
