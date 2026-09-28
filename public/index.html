@@ -398,6 +398,12 @@
       </div>
     </div>
 
+    <div class="section-title">💵 Relatório de recebimentos <span style="font-size:12px;font-weight:500;color:var(--text2)">(pagamentos confirmados)</span></div>
+    <div class="stat-card" style="margin-bottom:20px">
+      <div id="chart-pagamentos" class="chart-wrap"></div>
+      <div id="lista-pagamentos" style="margin-top:14px"></div>
+    </div>
+
     <div class="section-title">🏆 Últimos arremates</div>
     <div class="top-list" id="d-recentes">
       <div class="empty-state"><div class="icon">🔨</div>Nenhum arremate ainda</div>
@@ -1178,6 +1184,7 @@ function renderDashboard() {
 
   renderChartValores(valorMercado, valorArrematado);
   renderChartLotes(total - arrematados.length, arrematados.length);
+  renderChartPagamentos();
 }
 
 // ═══════════ GRÁFICOS (SVG puro) ═══════════
@@ -1236,6 +1243,69 @@ function renderChartLotes(disponiveis, arrematados) {
   el.innerHTML = svg + `<div class="chart-legend">
     <div class="chart-legend-item"><span class="chart-legend-dot" style="background:var(--text3)"></span>${total} lotes no total</div>
   </div>`;
+}
+
+// ═══════════ RELATÓRIO DE RECEBIMENTOS POR FORMA DE PAGAMENTO ═══════════
+function categoriaFormaPgto(forma) {
+  if (forma === 'Cartão de Débito' || forma === 'Cartão de Crédito') return 'Cartão';
+  if (forma === 'Dinheiro') return 'Dinheiro';
+  if (forma === 'PIX') return 'PIX';
+  return 'Não informado';
+}
+
+function calcularRecebimentos() {
+  const pagos = Object.values(lotesCache).filter(l => l.pago === 'SIM' && l.valorArrematado);
+  const porCategoria = { 'Cartão': 0, 'Dinheiro': 0, 'PIX': 0, 'Não informado': 0 };
+  const qtdPorCategoria = { 'Cartão': 0, 'Dinheiro': 0, 'PIX': 0, 'Não informado': 0 };
+  pagos.forEach(l => {
+    const cat = categoriaFormaPgto(l.formaPgto);
+    porCategoria[cat] += l.valorArrematado;
+    qtdPorCategoria[cat] += 1;
+  });
+  return { porCategoria, qtdPorCategoria, total: pagos.reduce((s,l) => s + l.valorArrematado, 0), qtdTotal: pagos.length };
+}
+
+function renderChartPagamentos() {
+  const elChart = document.getElementById('chart-pagamentos');
+  const elLista = document.getElementById('lista-pagamentos');
+  if (!elChart || !elLista) return;
+
+  const { porCategoria, qtdPorCategoria, total, qtdTotal } = calcularRecebimentos();
+  const cores = { 'Cartão': 'var(--blue)', 'Dinheiro': 'var(--green)', 'PIX': 'var(--accent)', 'Não informado': 'var(--text3)' };
+
+  const categorias = Object.keys(porCategoria).filter(cat => cat !== 'Não informado' || porCategoria[cat] > 0);
+  const max = Math.max(...categorias.map(c => porCategoria[c]), 1);
+  const w = 420, h = categorias.length * 60 + 10, barH = 34, gap = 26, padLeft = 10, padRight = 130;
+  const escala = (w - padLeft - padRight);
+
+  let svg = `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, sans-serif">`;
+  categorias.forEach((cat, i) => {
+    const valor = porCategoria[cat];
+    const y = i * (barH + gap) + 22;
+    const largura = Math.max((valor / max) * escala, 2);
+    svg += `
+      <text x="${padLeft}" y="${y - 8}" font-size="12" fill="var(--text2)" font-weight="600">${cat}</text>
+      <rect x="${padLeft}" y="${y}" width="${escala}" height="${barH}" rx="6" fill="var(--surface2)"></rect>
+      <rect x="${padLeft}" y="${y}" width="${largura}" height="${barH}" rx="6" fill="${cores[cat]}"></rect>
+      <text x="${padLeft + escala + 8}" y="${y + barH/2}" font-size="11" font-weight="800" fill="var(--text)" dominant-baseline="middle">${fmtMoney(valor)}</text>
+    `;
+  });
+  svg += `</svg>`;
+  elChart.innerHTML = svg;
+
+  elLista.innerHTML = categorias.map(cat => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)">
+        <span class="chart-legend-dot" style="background:${cores[cat]}"></span>${cat} — ${qtdPorCategoria[cat]} lote${qtdPorCategoria[cat]!==1?'s':''}
+      </span>
+      <span style="font-weight:700;color:var(--text)">${fmtMoney(porCategoria[cat])}</span>
+    </div>
+  `).join('') + `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;margin-top:6px">
+      <span style="font-size:13px;font-weight:700;color:var(--text)">Total recebido — ${qtdTotal} lote${qtdTotal!==1?'s':''}</span>
+      <span style="font-weight:800;font-size:16px;color:var(--green)">${fmtMoney(total)}</span>
+    </div>
+  `;
 }
 
 // ═══════════ LISTA ═══════════
