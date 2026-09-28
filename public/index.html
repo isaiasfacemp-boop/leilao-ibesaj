@@ -62,6 +62,8 @@
   .chart-legend{display:flex;gap:16px;margin-top:10px;flex-wrap:wrap}
   .chart-legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)}
   .chart-legend-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+  @keyframes barraPulsando { 0%,100%{opacity:1} 50%{opacity:.55} }
+  .barra-carregando{animation:barraPulsando 1.6s ease-in-out infinite}
   .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px}
   .stat-card .label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;font-weight:600}
   .stat-card .value{font-size:26px;font-weight:800;line-height:1}
@@ -411,7 +413,7 @@
       <button class="btn-outline no-print" style="font-size:12px;padding:7px 12px" onclick="imprimirRecebimentos()">🖨️ Imprimir relatório</button>
     </div>
     <div class="stat-card" style="margin-bottom:20px">
-      <div id="chart-pagamentos" class="chart-wrap" style="max-width:520px"></div>
+      <div id="chart-pagamentos" class="chart-wrap"></div>
       <div id="lista-pagamentos" style="margin-top:14px"></div>
     </div>
 
@@ -1305,12 +1307,14 @@ function renderChartPagamentos() {
     svg += `
       <text x="${padLeft}" y="${y - 8}" font-size="12" fill="var(--text2)" font-weight="600">${cat}</text>
       <rect x="${padLeft}" y="${y}" width="${escala}" height="${barH}" rx="6" fill="var(--surface2)"></rect>
-      <rect x="${padLeft}" y="${y}" width="${largura}" height="${barH}" rx="6" fill="${cores[cat]}"></rect>
+      <rect x="${padLeft}" y="${y}" width="${largura}" height="${barH}" rx="6" fill="${cores[cat]}" class="${valor > 0 ? 'barra-carregando' : ''}"></rect>
       <text x="${padLeft + escala + 8}" y="${y + barH/2}" font-size="11" font-weight="800" fill="var(--text)" dominant-baseline="middle">${fmtMoney(valor)}</text>
     `;
   });
   svg += `</svg>`;
-  elChart.innerHTML = svg;
+  elChart.innerHTML = svg + `<div class="chart-legend">
+    <div class="chart-legend-item"><span class="chart-legend-dot" style="background:var(--green)"></span>${qtdTotal} pagamento${qtdTotal!==1?'s':''} recebido${qtdTotal!==1?'s':''} — ${fmtMoney(total)}</div>
+  </div>`;
 
   elLista.innerHTML = categorias.map(cat => `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
