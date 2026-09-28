@@ -31,7 +31,7 @@
     --on-accent:#ffffff;
   }
   *,*::before,*::after{box-sizing:inherit;margin:0;padding:0}
-  html,body{height:100%}
+  html,body{height:100%;overscroll-behavior-y:contain}
   body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100dvh;display:flex;flex-direction:column}
 
   header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;gap:12px;flex-wrap:wrap}
@@ -1904,6 +1904,7 @@ function onCodigoDetectado(codigo, statusEl, detectedEl) {
       const hint = document.getElementById(cameraDestino + '-codigo-hint');
       if (hint) { hint.style.color = 'var(--text3)'; hint.textContent = ''; }
       showToast('✅','Código lido: ' + codigo, 'success');
+      buscarProdutoPorCodigo(cameraDestino); // busca o produto sozinho, sem precisar clicar em Buscar
     } else {
       const existente = Object.entries(lotesCache).find(([id,l]) => l.codigoBarras === codigo);
       if (existente) {
