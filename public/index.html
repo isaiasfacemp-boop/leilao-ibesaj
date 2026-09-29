@@ -1290,6 +1290,22 @@ function renderChartLotes(disponiveis, arrematados) {
 }
 
 // ═══════════ RELATÓRIO DE RECEBIMENTOS POR FORMA DE PAGAMENTO ═══════════
+// Arredonda porcentagens garantindo que a soma final dê exatamente 100%
+function percentuaisSomando100(valores) {
+  const total = valores.reduce((a,b) => a+b, 0);
+  if (total <= 0) return valores.map(() => 0);
+  const brutos = valores.map(v => (v / total) * 100);
+  const arredondados = brutos.map(Math.floor);
+  let restante = 100 - arredondados.reduce((a,b) => a+b, 0);
+  const ordemPorResto = brutos
+    .map((v,i) => ({ i, frac: v - Math.floor(v) }))
+    .sort((a,b) => b.frac - a.frac);
+  for (let k = 0; k < restante; k++) {
+    arredondados[ordemPorResto[k % ordemPorResto.length].i] += 1;
+  }
+  return arredondados;
+}
+
 function categoriaFormaPgto(forma) {
   if (forma === 'Cartão de Débito' || forma === 'Cartão de Crédito') return 'Cartão';
   if (forma === 'Dinheiro') return 'Dinheiro';
@@ -1326,20 +1342,21 @@ function renderChartPagamentos() {
   const cores = { 'Cartão': 'var(--blue)', 'Dinheiro': 'var(--green)', 'PIX': '#f97316', 'Não informado': 'var(--text3)' };
 
   const categorias = Object.keys(porCategoria).filter(cat => cat !== 'Não informado' || porCategoria[cat] > 0);
+  const pcts = percentuaisSomando100(categorias.map(cat => porCategoria[cat]));
   const w = 420, h = categorias.length * 60 + 10, barH = 34, gap = 26, padLeft = 10, padRight = 112;
   const escala = (w - padLeft - padRight);
 
   let svg = `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, sans-serif">`;
   categorias.forEach((cat, i) => {
     const valor = porCategoria[cat];
-    const pct = total > 0 ? (valor / total) * 100 : 0;
+    const pct = pcts[i];
     const y = i * (barH + gap) + 22;
     const largura = total > 0 ? Math.max((valor / total) * escala, 2) : 2;
     svg += `
       <text x="${padLeft}" y="${y - 8}" font-size="12" fill="var(--text2)" font-weight="600">${cat}</text>
       <rect x="${padLeft}" y="${y}" width="${escala}" height="${barH}" rx="6" fill="var(--surface2)"></rect>
-      <rect x="${padLeft}" y="${y}" width="${largura}" height="${barH}" rx="6" fill="${cores[cat]}" class="${valor > 0 ? 'barra-carregando' : ''}"></rect>
-      <text x="${padLeft + escala + 8}" y="${y + barH/2}" font-size="11" font-weight="800" fill="var(--text)" dominant-baseline="middle">${fmtMoney(valor)} <tspan fill="var(--text2)" font-weight="600">(${pct.toFixed(0)}%)</tspan></text>
+      <rect x="${padLeft}" y="${y}" width="${largura}" height="${barH}" rx="6" fill="${cores[cat]}"></rect>
+      <text x="${padLeft + escala + 8}" y="${y + barH/2}" font-size="11" font-weight="800" fill="var(--text)" dominant-baseline="middle">${fmtMoney(valor)} <tspan fill="var(--text2)" font-weight="600">(${pct}%)</tspan></text>
     `;
   });
   svg += `</svg>`;
@@ -2153,16 +2170,14 @@ function imprimirRecebimentos() {
   const { porCategoria, qtdPorCategoria, total, qtdTotal } = calcularRecebimentos();
   const categorias = Object.keys(porCategoria).filter(cat => cat !== 'Não informado' || porCategoria[cat] > 0);
 
-  const linhas = categorias.map(cat => {
-    const pct = total > 0 ? (porCategoria[cat] / total) * 100 : 0;
-    return `
+  const pctsImpressao = percentuaisSomando100(categorias.map(cat => porCategoria[cat]));
+  const linhas = categorias.map((cat, i) => `
     <tr>
       <td style="padding:8px;border-bottom:1px solid #ddd">${cat}</td>
       <td style="padding:8px;border-bottom:1px solid #ddd;text-align:center">${qtdPorCategoria[cat]}</td>
-      <td style="padding:8px;border-bottom:1px solid #ddd;text-align:center">${pct.toFixed(0)}%</td>
+      <td style="padding:8px;border-bottom:1px solid #ddd;text-align:center">${pctsImpressao[i]}%</td>
       <td style="padding:8px;border-bottom:1px solid #ddd;text-align:right">${fmtMoney(porCategoria[cat])}</td>
-    </tr>`;
-  }).join('');
+    </tr>`).join('');
 
   document.getElementById('print-pagamentos-tabela').innerHTML = `
     <thead>
