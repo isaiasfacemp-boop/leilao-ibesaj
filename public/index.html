@@ -1263,7 +1263,7 @@ function renderChartLotes(disponiveis, arrematados) {
   const el = document.getElementById('chart-lotes');
   if (!el) return;
   const total = disponiveis + arrematados;
-  const max = Math.max(disponiveis, arrematados, 1);
+  const totalDiv = total || 1;
   const w = 400, h = 180, barH = 34, gap = 26, padLeft = 10, padRight = 60;
   const escala = (w - padLeft - padRight);
 
@@ -1275,7 +1275,7 @@ function renderChartLotes(disponiveis, arrematados) {
   let svg = `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, sans-serif">`;
   barras.forEach((b, i) => {
     const y = i * (barH + gap) + 22;
-    const largura = Math.max((b.valor / max) * escala, 2);
+    const largura = Math.max((b.valor / totalDiv) * escala, 2);
     svg += `
       <text x="${padLeft}" y="${y - 8}" font-size="12" fill="var(--text2)" font-weight="600">${escapeHtml(b.label)}</text>
       <rect x="${padLeft}" y="${y}" width="${escala}" height="${barH}" rx="6" fill="var(--surface2)"></rect>
