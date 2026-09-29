@@ -196,6 +196,17 @@
   .table-photo-placeholder{width:34px;height:34px;border-radius:6px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text3);flex-shrink:0}
   .produto-cell{display:flex;align-items:center;gap:8px}
   .field input,.field select{background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;padding:10px 12px;outline:none;transition:border-color .2s;width:100%}
+
+  .forma-pgto-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--surface);transition:border-color .15s,background .15s}
+  .forma-pgto-row.ativa{border-color:var(--green);background:rgba(34,197,94,.08)}
+  .forma-pgto-row input[type=checkbox]{width:18px;height:18px;accent-color:var(--green);flex-shrink:0}
+  .forma-pgto-row .forma-pgto-nome{flex:1;font-size:13px;font-weight:600;color:var(--text)}
+  .forma-pgto-row input[type=text]{width:100px;padding:7px 9px;font-size:13px;text-align:right}
+  .forma-pgto-row input[type=text]:disabled{opacity:.35}
+  .resumo-pgto{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);font-size:13px;color:var(--text2)}
+  .resumo-pgto b{font-size:15px;color:var(--text)}
+  .resumo-pgto b.ok{color:var(--green)}
+  .resumo-pgto b.alerta{color:var(--accent)}
   .field input:focus,.field select:focus{border-color:var(--accent)}
 
   .modal-footer{padding:16px 22px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;flex-shrink:0}
@@ -564,14 +575,26 @@
       <div class="lote-preview" id="pagamento-preview"></div>
 
       <div class="field">
-        <label>Forma de pagamento</label>
-        <select id="p-formapgto">
-          <option value="">— Selecione —</option>
-          <option>Dinheiro</option>
-          <option>PIX</option>
-          <option>Cartão de Débito</option>
-          <option>Cartão de Crédito</option>
-        </select>
+        <label>Formas de pagamento (pode marcar mais de uma)</label>
+        <div class="forma-pgto-row" data-forma="Dinheiro">
+          <input type="checkbox" id="p-check-dinheiro" onchange="atualizarFormaPgtoRow('dinheiro')">
+          <span class="forma-pgto-nome">💵 Dinheiro</span>
+          <input type="text" id="p-valor-dinheiro" placeholder="0,00" disabled oninput="maskMoney(this); atualizarResumoPgto()">
+        </div>
+        <div class="forma-pgto-row" data-forma="PIX">
+          <input type="checkbox" id="p-check-pix" onchange="atualizarFormaPgtoRow('pix')">
+          <span class="forma-pgto-nome">📱 PIX</span>
+          <input type="text" id="p-valor-pix" placeholder="0,00" disabled oninput="maskMoney(this); atualizarResumoPgto()">
+        </div>
+        <div class="forma-pgto-row" data-forma="Cartão">
+          <input type="checkbox" id="p-check-cartao" onchange="atualizarFormaPgtoRow('cartao')">
+          <span class="forma-pgto-nome">💳 Cartão</span>
+          <input type="text" id="p-valor-cartao" placeholder="0,00" disabled oninput="maskMoney(this); atualizarResumoPgto()">
+        </div>
+        <div class="resumo-pgto">
+          <span>Total informado</span>
+          <b id="p-resumo-total">R$ 0,00</b>
+        </div>
       </div>
       <div class="field">
         <label>Pagamento</label>
@@ -1279,9 +1302,17 @@ function calcularRecebimentos() {
   const porCategoria = { 'Cartão': 0, 'Dinheiro': 0, 'PIX': 0, 'Não informado': 0 };
   const qtdPorCategoria = { 'Cartão': 0, 'Dinheiro': 0, 'PIX': 0, 'Não informado': 0 };
   pagos.forEach(l => {
-    const cat = categoriaFormaPgto(l.formaPgto);
-    porCategoria[cat] += l.valorArrematado;
-    qtdPorCategoria[cat] += 1;
+    const splits = parseFormaPgtoSalva(l.formaPgto, l.valorArrematado);
+    if (!splits.length) {
+      porCategoria['Não informado'] += l.valorArrematado;
+      qtdPorCategoria['Não informado'] += 1;
+    } else {
+      splits.forEach(s => {
+        if (porCategoria[s.forma] === undefined) return;
+        porCategoria[s.forma] += s.valor;
+        qtdPorCategoria[s.forma] += 1;
+      });
+    }
   });
   return { porCategoria, qtdPorCategoria, total: pagos.reduce((s,l) => s + l.valorArrematado, 0), qtdTotal: pagos.length };
 }
@@ -1439,6 +1470,19 @@ function abrirModal(id) {
 // ═══════════ MODAL DE PAGAMENTO (separado, ícone 💳 na lista) ═══════════
 let editingPagamentoId = null;
 
+// Lê o formaPgto salvo (JSON de splits, ou string antiga de uma forma só) e devolve sempre uma lista [{forma, valor}]
+function parseFormaPgtoSalva(formaPgto, valorArrematado) {
+  if (!formaPgto) return [];
+  try {
+    const arr = JSON.parse(formaPgto);
+    if (Array.isArray(arr)) return arr;
+  } catch(e) { /* não é JSON — é o formato antigo (uma forma só) */ }
+  // Formato antigo: string simples tipo "PIX" ou "Cartão de Débito"
+  const cat = categoriaFormaPgto(formaPgto);
+  if (cat === 'Não informado') return [];
+  return [{ forma: cat, valor: valorArrematado || 0 }];
+}
+
 function abrirModalPagamento(id) {
   const lote = lotesCache[id];
   if (!lote) return;
@@ -1452,11 +1496,60 @@ function abrirModalPagamento(id) {
       <span>Valor: <b>${fmtMoney(lote.valorArrematado)}</b></span>
     </div>`;
 
-  document.getElementById('p-formapgto').value = lote.formaPgto || '';
+  // Reseta as 3 linhas
+  ['dinheiro','pix','cartao'].forEach(chave => {
+    document.getElementById('p-check-' + chave).checked = false;
+    document.getElementById('p-valor-' + chave).value = '';
+    document.getElementById('p-valor-' + chave).disabled = true;
+    document.getElementById('p-check-' + chave).closest('.forma-pgto-row').classList.remove('ativa');
+  });
+
+  // Preenche com o que já estava salvo
+  const chavePorForma = { 'Dinheiro':'dinheiro', 'PIX':'pix', 'Cartão':'cartao' };
+  const splits = parseFormaPgtoSalva(lote.formaPgto, lote.valorArrematado);
+  splits.forEach(s => {
+    const chave = chavePorForma[s.forma];
+    if (!chave) return;
+    document.getElementById('p-check-' + chave).checked = true;
+    document.getElementById('p-valor-' + chave).disabled = false;
+    document.getElementById('p-valor-' + chave).value = (s.valor||0).toLocaleString('pt-BR',{minimumFractionDigits:2});
+    document.getElementById('p-check-' + chave).closest('.forma-pgto-row').classList.add('ativa');
+  });
+
   document.getElementById('p-pago').value = lote.pago || 'NAO';
+  atualizarResumoPgto();
 
   document.getElementById('modal-pagamento-overlay').classList.add('open');
-  setTimeout(() => document.getElementById('p-formapgto').focus(), 100);
+  setTimeout(() => document.getElementById('p-check-dinheiro').focus(), 100);
+}
+
+function atualizarFormaPgtoRow(chave) {
+  const check = document.getElementById('p-check-' + chave);
+  const valorInput = document.getElementById('p-valor-' + chave);
+  const row = check.closest('.forma-pgto-row');
+  valorInput.disabled = !check.checked;
+  row.classList.toggle('ativa', check.checked);
+  if (check.checked && !valorInput.value) valorInput.focus();
+  if (!check.checked) valorInput.value = '';
+  atualizarResumoPgto();
+}
+
+function atualizarResumoPgto() {
+  const lote = lotesCache[editingPagamentoId];
+  const totalLote = lote ? (lote.valorArrematado || 0) : 0;
+  let somado = 0;
+  ['dinheiro','pix','cartao'].forEach(chave => {
+    if (document.getElementById('p-check-' + chave).checked) {
+      somado += parseMoneyInput(document.getElementById('p-valor-' + chave).value);
+    }
+  });
+  const el = document.getElementById('p-resumo-total');
+  el.textContent = fmtMoney(somado);
+  el.className = '';
+  if (totalLote > 0) {
+    if (Math.abs(somado - totalLote) < 0.005) { el.textContent += ' ✓'; el.className = 'ok'; }
+    else if (somado > 0) { el.className = 'alerta'; }
+  }
 }
 
 function closeModalPagamento() {
@@ -1466,8 +1559,18 @@ function closeModalPagamento() {
 
 async function salvarPagamento() {
   if (!editingPagamentoId) return;
+
+  const splits = [];
+  const chavePorForma = { dinheiro:'Dinheiro', pix:'PIX', cartao:'Cartão' };
+  for (const chave of ['dinheiro','pix','cartao']) {
+    if (document.getElementById('p-check-' + chave).checked) {
+      const valor = parseMoneyInput(document.getElementById('p-valor-' + chave).value);
+      if (valor > 0) splits.push({ forma: chavePorForma[chave], valor });
+    }
+  }
+
   const payload = {
-    formaPgto: document.getElementById('p-formapgto').value,
+    formaPgto: splits.length ? JSON.stringify(splits) : '',
     pago: document.getElementById('p-pago').value,
   };
   try {
