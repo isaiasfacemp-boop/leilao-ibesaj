@@ -2063,7 +2063,7 @@ async function buscarProdutoPorCodigo(prefix) {
         await usarImagemUrlComoFoto(prefix, resultado.imagem);
       }
       hint.style.color = 'var(--green)';
-      hint.textContent = `✅ Encontrado: ${resultado.nome}${resultado.marca ? ' — ' + resultado.marca : ''}` + (resultado.fonte === 'web' ? ' (confira o nome)' : '');
+      hint.textContent = `✅ Encontrado: ${resultado.nome}${resultado.marca ? ' — ' + resultado.marca : ''}` + (resultado.fonte === 'web' ? ' (confira o nome)' : '') + ` [fonte: ${resultado.fonte || '?'} · v${resultado.v || 'antiga'}]`;
       showToast('✅','Produto encontrado e preenchido!','success');
     } else {
       hint.style.color = 'var(--accent)';
@@ -2085,7 +2085,7 @@ async function consultarOpenFoodFacts(codigo) {
   // Agora consulta o servidor, que tenta várias bases (alimentos, produtos gerais, UPCItemDB)
   try {
     const data = await api('/produto-lookup?codigo=' + encodeURIComponent(codigo));
-    return (data && data.produto) ? data.produto : null;
+    return (data && data.produto) ? Object.assign({ v: data.v }, data.produto) : null;
   } catch(e) { console.warn('Busca de produto falhou', e); throw e; }
 }
 
