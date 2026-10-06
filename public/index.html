@@ -2067,7 +2067,7 @@ async function buscarProdutoPorCodigo(prefix) {
       showToast('✅','Produto encontrado e preenchido!','success');
     } else {
       hint.style.color = 'var(--accent)';
-      hint.innerHTML = '⚠️ Não encontrado nas bases públicas. <a href="https://www.google.com/search?q=' + encodeURIComponent(codigo) + '" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">🔎 Buscar no Google</a> e preencha manualmente.';
+      hint.innerHTML = '⚠️ Não encontrado nas bases públicas. <a href="https://www.google.com/search?q=' + encodeURIComponent(codigo) + '" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">🔎 Buscar no Google</a> e preencha manualmente. <span style="opacity:.7">[v' + (window._ultimoV || 'antiga') + (window._ultimoDiag ? ' · cosmos: ' + window._ultimoDiag.cosmos : '') + ']</span>';
       showToast('ℹ️','Não encontrado — preencha manualmente.','');
     }
   } catch (err) {
@@ -2085,6 +2085,7 @@ async function consultarOpenFoodFacts(codigo) {
   // Agora consulta o servidor, que tenta várias bases (alimentos, produtos gerais, UPCItemDB)
   try {
     const data = await api('/produto-lookup?codigo=' + encodeURIComponent(codigo));
+    window._ultimoDiag = data && data.diag ? data.diag : null; window._ultimoV = data && data.v;
     return (data && data.produto) ? Object.assign({ v: data.v }, data.produto) : null;
   } catch(e) { console.warn('Busca de produto falhou', e); throw e; }
 }

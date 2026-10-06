@@ -103,7 +103,7 @@ async function fetchJsonTimeout(u, ms = 6000) {
   } catch (e) { return null; } finally { clearTimeout(t); }
 }
 
-async function buscarProdutoExterno(codigo, env) {
+async function buscarProdutoExterno(codigo, env, diag = {}) {
   const c = encodeURIComponent(codigo);
   // 1) Open Food Facts e 2) Open Products Facts (mesmo formato)
   for (const host of ["world.openfoodfacts.org", "world.openproductsfacts.org"]) {
@@ -125,18 +125,20 @@ async function buscarProdutoExterno(codigo, env) {
     }
   }
   // 3b) Cosmos Bluesoft (banco de códigos brasileiros) — só se o token estiver configurado
+  diag.cosmos = (env && env.COSMOS_TOKEN) ? "token ok" : "sem token";
   if (env && env.COSMOS_TOKEN) {
     try {
       const r = await fetch(`https://api.cosmos.bluesoft.com.br/gtins/${c}`, {
         headers: { "X-Cosmos-Token": env.COSMOS_TOKEN, "User-Agent": "Cosmos-API-Request", "Accept": "application/json" }
       });
+      diag.cosmos = "http " + r.status;
       if (r.ok) {
         const d = await r.json();
         if (d && d.description) {
           return { nome: d.description, marca: (d.brand && d.brand.name) || "", imagem: d.thumbnail || "", fonte: "cosmos" };
         }
       }
-    } catch (e) { /* segue para a próxima fonte */ }
+    } catch (e) { diag.cosmos = "erro: " + String(e).slice(0, 60); }
   }
   // 4) Busca na web (como o Google): pega o título do primeiro resultado
   const web = await buscarTituloNaWeb(codigo);
@@ -262,8 +264,9 @@ async function handleApi(request, env, url) {
   if (path === "/api/produto-lookup" && method === "GET") {
     const codigo = (url.searchParams.get("codigo") || "").replace(/\D/g, "").slice(0, 20);
     if (!codigo) return json({ error: "codigo", message: "Informe o código." }, 400);
-    const achado = await buscarProdutoExterno(codigo, env);
-    return json({ produto: achado, v: 3 });
+    const diag = {};
+    const achado = await buscarProdutoExterno(codigo, env, diag);
+    return json({ produto: achado, v: 4, diag });
   }
 
   // ───────── CONFIG DO LEILÃO ─────────
