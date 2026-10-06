@@ -93,6 +93,47 @@ function loteFromRow(row) {
   };
 }
 
+async function fetchJsonTimeout(u, ms = 6000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const r = await fetch(u, { signal: ctrl.signal, headers: { "User-Agent": "leilao-ibesaj/1.0", "Accept": "application/json" } });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) { return null; } finally { clearTimeout(t); }
+}
+
+async function buscarProdutoExterno(codigo) {
+  const c = encodeURIComponent(codigo);
+  // 1) Open Food Facts e 2) Open Products Facts (mesmo formato)
+  for (const host of ["world.openfoodfacts.org", "world.openproductsfacts.org"]) {
+    const d = await fetchJsonTimeout(`https://${host}/api/v2/product/${c}.json`);
+    if (d && d.status === 1 && d.product) {
+      const p = d.product;
+      const nome = p.product_name_pt || p.product_name || p.generic_name || "";
+      if (nome) {
+        return { nome: [nome, p.brands ? `(${p.brands})` : ""].filter(Boolean).join(" "), marca: p.brands || "", imagem: p.image_front_url || p.image_url || "", fonte: host };
+      }
+    }
+  }
+  // 3) UPCItemDB (produtos em geral)
+  const u = await fetchJsonTimeout(`https://api.upcitemdb.com/prod/trial/lookup?upc=${c}`);
+  if (u && Array.isArray(u.items) && u.items.length) {
+    const it = u.items[0];
+    if (it.title) {
+      return { nome: it.title, marca: it.brand || "", imagem: (it.images && it.images[0]) || "", fonte: "upcitemdb" };
+    }
+  }
+  return null;
+}
+
+let logoColunaOk = false;
+async function garantirColunaLogo(env) {
+  if (logoColunaOk) return;
+  try { await env.DB.prepare("ALTER TABLE config ADD COLUMN logo TEXT DEFAULT ''").run(); } catch (e) { /* já existe */ }
+  logoColunaOk = true;
+}
+
 async function handleApi(request, env, url) {
   const path = url.pathname;
   const method = request.method;
@@ -150,14 +191,28 @@ async function handleApi(request, env, url) {
     return json({ ok: hash === row.password_hash });
   }
 
+  // ───────── BUSCA DE PRODUTO POR CÓDIGO DE BARRAS ─────────
+  if (path === "/api/produto-lookup" && method === "GET") {
+    const codigo = (url.searchParams.get("codigo") || "").replace(/\D/g, "").slice(0, 20);
+    if (!codigo) return json({ error: "codigo", message: "Informe o código." }, 400);
+    const achado = await buscarProdutoExterno(codigo);
+    return json({ produto: achado });
+  }
+
   // ───────── CONFIG DO LEILÃO ─────────
   if (path === "/api/config" && method === "GET") {
+    await garantirColunaLogo(env);
     const row = await env.DB.prepare("SELECT * FROM config WHERE id = 1").first();
     return json({ config: row || {} });
   }
 
   if (path === "/api/config" && method === "PUT") {
-    const body = await readJson(request, 10000);
+    const body = await readJson(request, 600000);
+    await garantirColunaLogo(env);
+    if (typeof body.logo === "string") {
+      if (body.logo && !body.logo.startsWith("data:image/")) return json({ error: "logo", message: "Imagem inválida." }, 400);
+      await env.DB.prepare("UPDATE config SET logo = ? WHERE id = 1").bind(str(body.logo, 400000)).run();
+    }
     await env.DB.prepare(
       `UPDATE config SET nome=?, edicao=?, data=?, ano=?, descontoPadrao=? WHERE id = 1`
     ).bind(
@@ -180,6 +235,22 @@ async function handleApi(request, env, url) {
       "UPDATE lotes SET valorInicial = ROUND(valorComercial * ?, 2) WHERE valorComercial > 0"
     ).bind(1 - pct / 100).run();
     return json({ ok: true, afetados: result.meta.changes, percentual: pct });
+  }
+
+  if (path === "/api/leilao/zerar" && method === "POST") {
+    if (!auth.master) return json({ error: "sem_permissao", message: "Somente o administrador pode zerar o leilão." }, 403);
+    const body = await readJson(request, 2000);
+    if (body.modo === "tudo") {
+      const r = await env.DB.prepare("DELETE FROM lotes").run();
+      return json({ ok: true, modo: "tudo", afetados: r.meta.changes });
+    }
+    if (body.modo === "arremates") {
+      const r = await env.DB.prepare(
+        "UPDATE lotes SET valorArrematado = NULL, comprador = '', contato = '', formaPgto = '', pago = 'NAO', status = 'DISPONÍVEL', atualizadoPor = ?, atualizadoEm = ?"
+      ).bind(auth.username, Date.now()).run();
+      return json({ ok: true, modo: "arremates", afetados: r.meta.changes });
+    }
+    return json({ error: "modo", message: "Modo inválido." }, 400);
   }
 
   if (path === "/api/lotes" && method === "GET") {
