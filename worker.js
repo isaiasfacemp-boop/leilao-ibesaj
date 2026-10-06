@@ -202,6 +202,14 @@ async function garantirTabelaCache(env) {
   await env.DB.prepare(
     "CREATE TABLE IF NOT EXISTS produto_cache (codigo TEXT PRIMARY KEY, nome TEXT, marca TEXT, imagem TEXT, fonte TEXT, criadoEm INTEGER)"
   ).run();
+  // aproveita os lotes já cadastrados (código de barras + nome) como catálogo inicial
+  try {
+    await env.DB.prepare(
+      "INSERT OR IGNORE INTO produto_cache (codigo, nome, marca, imagem, fonte, criadoEm) " +
+      "SELECT codigoBarras, produto, '', '', 'cadastro', 0 FROM lotes " +
+      "WHERE codigoBarras IS NOT NULL AND LENGTH(codigoBarras) BETWEEN 8 AND 14 AND produto IS NOT NULL AND produto != ''"
+    ).run();
+  } catch (e) { /* tabela de lotes pode não existir ainda */ }
   cacheTabelaOk = true;
 }
 
@@ -210,6 +218,19 @@ async function garantirColunaLogo(env) {
   if (logoColunaOk) return;
   try { await env.DB.prepare("ALTER TABLE config ADD COLUMN logo TEXT DEFAULT ''").run(); } catch (e) { /* já existe */ }
   logoColunaOk = true;
+}
+
+// Aprende com os cadastros: guarda "código de barras → nome" para preencher sozinho nas próximas vezes
+async function aprenderProduto(env, codigo, nome, usuario) {
+  try {
+    const cod = String(codigo || "").replace(/\D/g, "");
+    const nm = str(nome, 200).trim();
+    if (cod.length < 8 || cod.length > 14 || !nm) return;
+    await garantirTabelaCache(env);
+    await env.DB.prepare(
+      "INSERT OR REPLACE INTO produto_cache (codigo, nome, marca, imagem, fonte, criadoEm) VALUES (?, ?, '', '', 'cadastro', ?)"
+    ).bind(cod, nm, Date.now()).run();
+  } catch (e) { /* aprender é opcional: nunca derruba o cadastro */ }
 }
 
 async function handleApi(request, env, url) {
@@ -374,6 +395,7 @@ async function handleApi(request, env, url) {
       str(body.foto, 2000000), auth.username, Date.now()
     ).run();
 
+    await aprenderProduto(env, codigoBarras, produto, auth.username);
     return json({ id });
   }
 
@@ -409,6 +431,14 @@ async function handleApi(request, env, url) {
     vals.push(id);
 
     await env.DB.prepare(`UPDATE lotes SET ${sets.join(", ")} WHERE id = ?`).bind(...vals).run();
+    if (body.produto !== undefined || body.codigoBarras !== undefined) {
+      await aprenderProduto(
+        env,
+        body.codigoBarras !== undefined ? body.codigoBarras : target.codigoBarras,
+        body.produto !== undefined ? body.produto : target.produto,
+        auth.username
+      );
+    }
     return json({ ok: true });
   }
 
