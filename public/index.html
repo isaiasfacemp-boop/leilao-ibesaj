@@ -2067,7 +2067,7 @@ async function buscarProdutoPorCodigo(prefix) {
       showToast('✅','Produto encontrado e preenchido!','success');
     } else {
       hint.style.color = 'var(--accent)';
-      hint.innerHTML = '⚠️ Não encontrado nas bases públicas. <a href="https://www.google.com/search?q=' + encodeURIComponent(codigo) + '" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">🔎 Buscar no Google</a> e preencha manualmente. <span style="opacity:.7">[v' + (window._ultimoV || 'antiga') + (window._ultimoDiag ? ' · cosmos: ' + window._ultimoDiag.cosmos : '') + ']</span>';
+      hint.innerHTML = '⚠️ Não encontrado nas bases públicas. <a href="https://www.google.com/search?q=' + encodeURIComponent(codigo) + '" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">🔎 Buscar no Google</a> e preencha manualmente. <span style="opacity:.7">[v' + (window._ultimoV || 'antiga') + (window._ultimoDiag && window._ultimoDiag.cosmos ? ' · cosmos: ' + window._ultimoDiag.cosmos : '') + ']</span>';
       showToast('ℹ️','Não encontrado — preencha manualmente.','');
     }
   } catch (err) {

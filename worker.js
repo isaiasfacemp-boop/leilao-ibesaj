@@ -196,6 +196,15 @@ async function buscarTituloNaWeb(codigo) {
   return limpos.length ? limpos[0] : null;
 }
 
+let cacheTabelaOk = false;
+async function garantirTabelaCache(env) {
+  if (cacheTabelaOk) return;
+  await env.DB.prepare(
+    "CREATE TABLE IF NOT EXISTS produto_cache (codigo TEXT PRIMARY KEY, nome TEXT, marca TEXT, imagem TEXT, fonte TEXT, criadoEm INTEGER)"
+  ).run();
+  cacheTabelaOk = true;
+}
+
 let logoColunaOk = false;
 async function garantirColunaLogo(env) {
   if (logoColunaOk) return;
@@ -265,8 +274,23 @@ async function handleApi(request, env, url) {
     const codigo = (url.searchParams.get("codigo") || "").replace(/\D/g, "").slice(0, 20);
     if (!codigo) return json({ error: "codigo", message: "Informe o código." }, 400);
     const diag = {};
+    await garantirTabelaCache(env);
+    // 1) cache: produto já encontrado antes não gasta consulta externa
+    const cache = await env.DB.prepare("SELECT nome, marca, imagem, fonte FROM produto_cache WHERE codigo = ?").bind(codigo).first();
+    if (cache) {
+      diag.cache = "acerto";
+      return json({ produto: { nome: cache.nome, marca: cache.marca || "", imagem: cache.imagem || "", fonte: "cache (" + (cache.fonte || "?") + ")" }, v: 5, diag });
+    }
     const achado = await buscarProdutoExterno(codigo, env, diag);
-    return json({ produto: achado, v: 4, diag });
+    // guarda só fontes confiáveis (não a busca solta na web)
+    if (achado && achado.fonte && achado.fonte !== "web") {
+      try {
+        await env.DB.prepare(
+          "INSERT OR REPLACE INTO produto_cache (codigo, nome, marca, imagem, fonte, criadoEm) VALUES (?, ?, ?, ?, ?, ?)"
+        ).bind(codigo, str(achado.nome, 200), str(achado.marca || "", 100), str(achado.imagem || "", 500), achado.fonte, Date.now()).run();
+      } catch (e) { diag.cacheErro = String(e).slice(0, 60); }
+    }
+    return json({ produto: achado, v: 5, diag });
   }
 
   // ───────── CONFIG DO LEILÃO ─────────
