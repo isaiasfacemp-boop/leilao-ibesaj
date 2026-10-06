@@ -249,7 +249,7 @@ async function handleApi(request, env, url) {
     const codigo = (url.searchParams.get("codigo") || "").replace(/\D/g, "").slice(0, 20);
     if (!codigo) return json({ error: "codigo", message: "Informe o código." }, 400);
     const achado = await buscarProdutoExterno(codigo);
-    return json({ produto: achado });
+    return json({ produto: achado, v: 3 });
   }
 
   // ───────── CONFIG DO LEILÃO ─────────
