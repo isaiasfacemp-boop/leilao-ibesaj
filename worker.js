@@ -124,7 +124,51 @@ async function buscarProdutoExterno(codigo) {
       return { nome: it.title, marca: it.brand || "", imagem: (it.images && it.images[0]) || "", fonte: "upcitemdb" };
     }
   }
+  // 4) Busca na web (como o Google): pega o título do primeiro resultado
+  const web = await buscarTituloNaWeb(codigo);
+  if (web) return { nome: web, marca: "", imagem: "", fonte: "web" };
   return null;
+}
+
+function decodificarHtml(s) {
+  return s.replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;|&#x27;/g, "'")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ")
+    .replace(/&#(\d+);/g, (m, n) => String.fromCharCode(+n)).replace(/\s+/g, " ").trim();
+}
+
+function limparTituloLoja(t) {
+  let s = decodificarHtml(t);
+  // tira o nome da loja no final: " | Loja", " - Loja", " – Loja"
+  const partes = s.split(/\s+[|\-–—]\s+/);
+  if (partes.length > 1 && partes[0].length >= 8) s = partes[0];
+  s = s.replace(/^(comprar|compre)\s+/i, "").replace(/\s*\.\.\.$/, "").trim();
+  return s.slice(0, 150);
+}
+
+async function buscarTituloNaWeb(codigo) {
+  const ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+  const pegar = async (u) => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 7000);
+    try {
+      const r = await fetch(u, { signal: ctrl.signal, headers: { "User-Agent": ua, "Accept-Language": "pt-BR,pt;q=0.9" } });
+      if (!r.ok) return "";
+      return await r.text();
+    } catch (e) { return ""; } finally { clearTimeout(t); }
+  };
+  const q = encodeURIComponent(codigo);
+  const titulos = [];
+  // DuckDuckGo (versão HTML)
+  const ddg = await pegar(`https://html.duckduckgo.com/html/?q=${q}&kl=br-pt`);
+  for (const m of ddg.matchAll(/<a[^>]+class="result__a"[^>]*>([\s\S]*?)<\/a>/g)) titulos.push(m[1]);
+  // Bing
+  if (titulos.length < 3) {
+    const bing = await pegar(`https://www.bing.com/search?q=${q}&setlang=pt-BR&cc=BR`);
+    for (const m of bing.matchAll(/<li class="b_algo"[\s\S]*?<h2[^>]*>\s*<a[^>]*>([\s\S]*?)<\/a>/g)) titulos.push(m[1]);
+  }
+  const limpos = titulos.map(limparTituloLoja).filter((t) => t.length >= 6 && !/^\d+$/.test(t));
+  return limpos.length ? limpos[0] : null;
 }
 
 let logoColunaOk = false;

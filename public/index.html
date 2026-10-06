@@ -2045,7 +2045,7 @@ async function buscarProdutoPorCodigo(prefix) {
         await usarImagemUrlComoFoto(prefix, resultado.imagem);
       }
       hint.style.color = 'var(--green)';
-      hint.textContent = `✅ Encontrado: ${resultado.nome}${resultado.marca ? ' — ' + resultado.marca : ''}`;
+      hint.textContent = `✅ Encontrado: ${resultado.nome}${resultado.marca ? ' — ' + resultado.marca : ''}` + (resultado.fonte === 'web' ? ' (confira o nome)' : '');
       showToast('✅','Produto encontrado e preenchido!','success');
     } else {
       hint.style.color = 'var(--accent)';
