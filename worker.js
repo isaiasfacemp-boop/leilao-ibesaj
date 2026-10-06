@@ -160,13 +160,21 @@ async function buscarTituloNaWeb(codigo) {
   };
   const q = encodeURIComponent(codigo);
   const titulos = [];
-  // DuckDuckGo (versão HTML)
-  const ddg = await pegar(`https://html.duckduckgo.com/html/?q=${q}&kl=br-pt`);
-  for (const m of ddg.matchAll(/<a[^>]+class="result__a"[^>]*>([\s\S]*?)<\/a>/g)) titulos.push(m[1]);
-  // Bing
-  if (titulos.length < 3) {
-    const bing = await pegar(`https://www.bing.com/search?q=${q}&setlang=pt-BR&cc=BR`);
-    for (const m of bing.matchAll(/<li class="b_algo"[\s\S]*?<h2[^>]*>\s*<a[^>]*>([\s\S]*?)<\/a>/g)) titulos.push(m[1]);
+  const coletar = (html, marcador, extrairTitulo) => {
+    const blocos = html.split(marcador).slice(1);
+    for (const bloco of blocos) {
+      const trecho = bloco.slice(0, 2500);
+      // só vale se o código aparece no próprio resultado (evita produtos aleatórios)
+      if (!trecho.replace(/[\s.\-]/g, "").includes(codigo)) continue;
+      const t = extrairTitulo(trecho);
+      if (t) titulos.push(t);
+    }
+  };
+  const ddg = await pegar(`https://html.duckduckgo.com/html/?q=${encodeURIComponent('"' + codigo + '"')}&kl=br-pt`);
+  coletar(ddg, 'class="result__a"', (b) => { const m = b.match(/^[^>]*>([\s\S]*?)<\/a>/); return m ? m[1] : ""; });
+  if (!titulos.length) {
+    const bing = await pegar(`https://www.bing.com/search?q=${encodeURIComponent('"' + codigo + '"')}&setlang=pt-BR&cc=BR`);
+    coletar(bing, '<li class="b_algo"', (b) => { const m = b.match(/<h2[^>]*>\s*<a[^>]*>([\s\S]*?)<\/a>/); return m ? m[1] : ""; });
   }
   const limpos = titulos.map(limparTituloLoja).filter((t) => t.length >= 6 && !/^\d+$/.test(t));
   return limpos.length ? limpos[0] : null;
