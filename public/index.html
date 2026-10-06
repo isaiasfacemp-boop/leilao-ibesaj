@@ -2025,6 +2025,24 @@ function maskMoney(el) {
 }
 
 // ═══════════ BUSCA DE PRODUTO EM BANCOS PÚBLICOS (Open Food Facts) ═══════════
+
+// Busca automática ao digitar/colar um código completo (EAN-8, UPC-12, EAN-13, GTIN-14)
+['nf','lf'].forEach(prefix => {
+  const el = document.getElementById(prefix + '-codigobarras');
+  if (!el) return;
+  let timer = null;
+  el.addEventListener('input', () => {
+    clearTimeout(timer);
+    const cod = el.value.replace(/\D/g, '');
+    if (![8, 12, 13, 14].includes(cod.length)) return;
+    timer = setTimeout(() => {
+      const prod = document.getElementById(prefix + '-produto');
+      if (prod && prod.value.trim()) return; // não sobrescreve nome já preenchido
+      buscarProdutoPorCodigo(prefix);
+    }, 700);
+  });
+});
+
 async function buscarProdutoPorCodigo(prefix) {
   const codigo = document.getElementById(prefix + '-codigobarras').value.trim();
   const hint = document.getElementById(prefix + '-codigo-hint');
