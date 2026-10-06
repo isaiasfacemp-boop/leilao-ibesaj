@@ -134,6 +134,7 @@ function decodificarHtml(s) {
   return s.replace(/<[^>]+>/g, "")
     .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;|&#x27;/g, "'")
     .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ")
+    .replace(/&([aeiouAEIOU])(acute|grave|circ|tilde|uml);/g, (m, v, t) => ({ acute: "áéíóúÁÉÍÓÚ", grave: "àèìòùÀÈÌÒÙ", circ: "âêîôûÂÊÎÔÛ", tilde: "ãẽĩõũÃẼĨÕŨ", uml: "äëïöüÄËÏÖÜ" })[t]["aeiouAEIOU".indexOf(v)]).replace(/&ccedil;/g, "ç").replace(/&Ccedil;/g, "Ç")
     .replace(/&#(\d+);/g, (m, n) => String.fromCharCode(+n)).replace(/\s+/g, " ").trim();
 }
 
