@@ -423,7 +423,7 @@
     </div>
 
     <div class="stat-card" style="margin-bottom:20px">
-      <div class="label">Progresso do leilão</div>
+      <div class="label" id="d-progress-label">Progresso do leilão</div>
       <div class="progress-bar"><div class="progress-fill" id="d-progress" style="width:0%"></div></div>
     </div>
 
@@ -1315,7 +1315,9 @@ function renderDashboard() {
   document.getElementById('d-disponiveis').textContent = (total - arrematados.length) + ' disponíveis';
   document.getElementById('d-arrematados-count').textContent = arrematados.length;
   document.getElementById('d-ticket').textContent = 'ticket médio ' + fmtMoney(ticketMedio);
-  document.getElementById('d-progress').style.width = Math.min(pct,100) + '%';
+  const pctLotes = total > 0 ? (arrematados.length / total * 100) : 0;
+  document.getElementById('d-progress').style.width = Math.min(pctLotes,100) + '%';
+  document.getElementById('d-progress-label').textContent = 'Progresso do leilão — ' + (Number.isInteger(pctLotes) ? pctLotes : pctLotes.toFixed(1).replace('.', ',')) + '% (' + arrematados.length + ' de ' + total + ' lotes)';
 
   const recentes = arrematados.filter(l => l.atualizadoEm)
     .sort((a,b) => (b.atualizadoEm||0) - (a.atualizadoEm||0)).slice(0,8);
@@ -1506,9 +1508,9 @@ function atualizarProgressoLista() {
   const arr = lotes.filter(l => l.status === 'ARREMATADO');
   const valorMercado = lotes.reduce((s,l) => s + (l.valorComercial||0), 0);
   const valorArr = arr.reduce((s,l) => s + (l.valorArrematado||0), 0);
-  const pct = valorMercado > 0 ? (valorArr / valorMercado * 100) : 0;
+  const pct = total > 0 ? (arr.length / total * 100) : 0;
   el.style.width = Math.min(pct, 100) + '%';
-  document.getElementById('lp-pct').textContent = pct.toFixed(1).replace('.', ',') + '%';
+  document.getElementById('lp-pct').textContent = (Number.isInteger(pct) ? String(pct) : pct.toFixed(1).replace('.', ',')) + '%';
   document.getElementById('lp-valores').innerHTML = '<b>' + fmtMoney(valorArr) + '</b> arrematados de ' + fmtMoney(valorMercado);
   document.getElementById('lp-lotes').innerHTML = '<b>' + arr.length + '</b> de ' + total + ' lotes arrematados';
 }
