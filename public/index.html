@@ -73,6 +73,16 @@
   .c-accent{color:var(--accent)} .c-green{color:var(--green)} .c-blue{color:var(--blue)} .c-red{color:var(--red)}
 
   .progress-bar{width:100%;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;margin-top:10px}
+
+  /* Progresso do leilão na aba Lotes (e no PDF da lista) */
+  .lista-progresso{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin:0 0 14px}
+  .lista-progresso-topo{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .lista-progresso-label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3)}
+  .lista-progresso-pct{font-size:18px;font-weight:800;color:var(--green)}
+  .lista-progresso .progress-bar{height:10px;margin-top:8px}
+  .lista-progresso-info{display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 14px;margin-top:8px;font-size:12px;color:var(--text2)}
+  .lista-progresso-info b{color:var(--text)}
+  #lp-valores{display:none} /* valores em R$ aparecem só no PDF */
   .progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:4px;transition:width .4s ease}
 
   .section-title{font-size:15px;font-weight:700;margin:24px 0 12px;display:flex;align-items:center;gap:8px}
@@ -243,6 +253,13 @@
     .print-card { border-color:#333; }
 
     .print-lista-titulo { display:block !important; }
+    .lista-progresso { background:#fff !important; border:1px solid #999 !important; border-radius:6px !important; padding:8px 12px !important; margin:0 0 10px !important; break-inside:avoid; }
+    .lista-progresso-label, .lista-progresso-info, .lista-progresso-info b { color:#000 !important; }
+    .lista-progresso-pct { color:#000 !important; font-size:15px !important; }
+    .lista-progresso .progress-bar { background:#e3e3e3 !important; border:1px solid #bbb; height:10px !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .lista-progresso .progress-fill { background:#2f9e5b !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    #lp-valores { display:inline !important; }
+    body.imprimindo-pagamentos #lista-progresso { display:none !important; }
     .only-print { display:table !important; }
 
     .table-section { border:none !important; background:#fff !important; }
@@ -477,6 +494,17 @@
       <h2 id="print-lista-nome" style="margin:0;font-size:18px">Leilão</h2>
       <p id="print-lista-data" style="margin:4px 0 0;font-size:11px;color:#666">Lista de lotes</p>
     </div>
+    <div class="lista-progresso" id="lista-progresso">
+      <div class="lista-progresso-topo">
+        <span class="lista-progresso-label">Progresso do leilão</span>
+        <span class="lista-progresso-pct" id="lp-pct">0%</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="lp-fill" style="width:0%"></div></div>
+      <div class="lista-progresso-info">
+        <span id="lp-valores"></span>
+        <span id="lp-lotes"></span>
+      </div>
+    </div>
     <div class="table-section">
       <div class="table-wrap">
         <table id="lista-tabela">
@@ -578,20 +606,21 @@
 
       <div class="field">
         <label>Formas de pagamento (pode marcar mais de uma)</label>
+        <div style="font-size:11px;color:var(--text-dim,#888);margin:-2px 0 6px">O que sobrar é preenchido automaticamente na próxima forma marcada.</div>
         <div class="forma-pgto-row" data-forma="Dinheiro">
           <input type="checkbox" id="p-check-dinheiro" onchange="atualizarFormaPgtoRow('dinheiro')">
           <span class="forma-pgto-nome">💵 Dinheiro</span>
-          <input type="text" id="p-valor-dinheiro" placeholder="0,00" disabled oninput="maskMoney(this); atualizarResumoPgto()">
+          <input type="text" id="p-valor-dinheiro" placeholder="0,00" disabled oninput="maskMoney(this); pgtoDigitou('dinheiro')">
         </div>
         <div class="forma-pgto-row" data-forma="PIX">
           <input type="checkbox" id="p-check-pix" onchange="atualizarFormaPgtoRow('pix')">
           <span class="forma-pgto-nome">📱 PIX</span>
-          <input type="text" id="p-valor-pix" placeholder="0,00" disabled oninput="maskMoney(this); atualizarResumoPgto()">
+          <input type="text" id="p-valor-pix" placeholder="0,00" disabled oninput="maskMoney(this); pgtoDigitou('pix')">
         </div>
         <div class="forma-pgto-row" data-forma="Cartão">
           <input type="checkbox" id="p-check-cartao" onchange="atualizarFormaPgtoRow('cartao')">
           <span class="forma-pgto-nome">💳 Cartão</span>
-          <input type="text" id="p-valor-cartao" placeholder="0,00" disabled oninput="maskMoney(this); atualizarResumoPgto()">
+          <input type="text" id="p-valor-cartao" placeholder="0,00" disabled oninput="maskMoney(this); pgtoDigitou('cartao')">
         </div>
         <div class="resumo-pgto">
           <span>Total informado</span>
@@ -1469,7 +1498,23 @@ function renderChartPagamentos() {
 }
 
 // ═══════════ LISTA ═══════════
+function atualizarProgressoLista() {
+  const el = document.getElementById('lp-fill');
+  if (!el) return;
+  const lotes = Object.values(lotesCache);
+  const total = lotes.length;
+  const arr = lotes.filter(l => l.status === 'ARREMATADO');
+  const valorMercado = lotes.reduce((s,l) => s + (l.valorComercial||0), 0);
+  const valorArr = arr.reduce((s,l) => s + (l.valorArrematado||0), 0);
+  const pct = valorMercado > 0 ? (valorArr / valorMercado * 100) : 0;
+  el.style.width = Math.min(pct, 100) + '%';
+  document.getElementById('lp-pct').textContent = pct.toFixed(1).replace('.', ',') + '%';
+  document.getElementById('lp-valores').innerHTML = '<b>' + fmtMoney(valorArr) + '</b> arrematados de ' + fmtMoney(valorMercado);
+  document.getElementById('lp-lotes').innerHTML = '<b>' + arr.length + '</b> de ' + total + ' lotes arrematados';
+}
+
 function renderLista() {
+  atualizarProgressoLista();
   const q = (document.getElementById('lista-search').value || '').toLowerCase();
   const statusF = document.getElementById('lista-filter').value;
   const pagoF = document.getElementById('lista-pago-filter').value;
@@ -1625,20 +1670,76 @@ function abrirModalPagamento(id) {
   });
 
   document.getElementById('p-pago').value = lote.pago || 'NAO';
+  PGTO_MANUAL = {};
+  splits.forEach(sp => { const k = chavePorForma[sp.forma]; if (k) PGTO_MANUAL[k] = true; });
   atualizarResumoPgto();
 
   document.getElementById('modal-pagamento-overlay').classList.add('open');
   setTimeout(() => document.getElementById('p-check-dinheiro').focus(), 100);
 }
 
+let PGTO_MANUAL = {};
+const PGTO_CHAVES = ['dinheiro','pix','cartao'];
+function pgtoCentavos(chave) {
+  return Math.round(parseMoneyInput(document.getElementById('p-valor-' + chave).value) * 100);
+}
+function pgtoSetValor(chave, cents) {
+  document.getElementById('p-valor-' + chave).value = (cents/100).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function pgtoSetAtiva(chave, on) {
+  const c = document.getElementById('p-check-' + chave);
+  c.checked = on;
+  document.getElementById('p-valor-' + chave).disabled = !on;
+  c.closest('.forma-pgto-row').classList.toggle('ativa', on);
+  if (!on) { document.getElementById('p-valor-' + chave).value = ''; delete PGTO_MANUAL[chave]; }
+}
+// Reparte o que falta do total entre as formas "automáticas"
+function pgtoRedistribuir() {
+  const lote = lotesCache[editingPagamentoId];
+  const total = lote ? Math.round((lote.valorArrematado || 0) * 100) : 0;
+  if (total <= 0) return;
+  const marcadas = PGTO_CHAVES.filter(k => document.getElementById('p-check-' + k).checked);
+  const manuais = marcadas.filter(k => PGTO_MANUAL[k]);
+  const autos = marcadas.filter(k => !PGTO_MANUAL[k]);
+  const soma = manuais.reduce((a, k) => a + pgtoCentavos(k), 0);
+  const resto = total - soma;
+  if (autos.length) {
+    if (resto > 0) {
+      pgtoSetValor(autos[0], resto);
+      autos.slice(1).forEach(k => pgtoSetAtiva(k, false));
+    } else {
+      autos.forEach(k => pgtoSetAtiva(k, false));
+    }
+  } else if (resto > 0) {
+    const livres = PGTO_CHAVES.filter(k => !document.getElementById('p-check-' + k).checked);
+    if (livres.length === 1 && manuais.length) {
+      pgtoSetAtiva(livres[0], true);
+      pgtoSetValor(livres[0], resto);
+    }
+  }
+}
 function atualizarFormaPgtoRow(chave) {
   const check = document.getElementById('p-check-' + chave);
   const valorInput = document.getElementById('p-valor-' + chave);
-  const row = check.closest('.forma-pgto-row');
-  valorInput.disabled = !check.checked;
-  row.classList.toggle('ativa', check.checked);
-  if (check.checked && !valorInput.value) valorInput.focus();
-  if (!check.checked) valorInput.value = '';
+  if (check.checked) {
+    // congela as outras formas já marcadas (o que está nelas vira "digitado")
+    PGTO_CHAVES.forEach(k => { if (k !== chave && document.getElementById('p-check-' + k).checked) PGTO_MANUAL[k] = true; });
+    pgtoSetAtiva(chave, true);
+    const lote = lotesCache[editingPagamentoId];
+    const total = lote ? Math.round((lote.valorArrematado || 0) * 100) : 0;
+    const outros = PGTO_CHAVES.filter(k => k !== chave && document.getElementById('p-check-' + k).checked)
+      .reduce((a, k) => a + pgtoCentavos(k), 0);
+    if (total - outros > 0) pgtoSetValor(chave, total - outros);
+    valorInput.focus(); valorInput.select();
+  } else {
+    pgtoSetAtiva(chave, false);
+    pgtoRedistribuir();
+  }
+  atualizarResumoPgto();
+}
+function pgtoDigitou(chave) {
+  PGTO_MANUAL[chave] = true;
+  pgtoRedistribuir();
   atualizarResumoPgto();
 }
 
