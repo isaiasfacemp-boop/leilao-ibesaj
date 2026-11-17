@@ -293,6 +293,20 @@
   .conn-dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
   .conn-dot.off{background:var(--red)}
 
+  /* AUTOCOMPLETE DE PRODUTO */
+  .produto-autocomplete-wrap{position:relative}
+  .produto-suggestions{position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--accent);border-top:none;border-radius:0 0 8px 8px;z-index:300;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.35);display:none}
+  .produto-suggestions.open{display:block}
+  .produto-suggestion-item{display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;border-bottom:1px solid rgba(46,51,71,.4);transition:background .12s}
+  .produto-suggestion-item:last-child{border-bottom:none}
+  .produto-suggestion-item:hover,.produto-suggestion-item.ativo{background:var(--surface2)}
+  .produto-suggestion-thumb{width:34px;height:34px;border-radius:6px;object-fit:cover;flex-shrink:0;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--text3)}
+  .produto-suggestion-thumb img{width:100%;height:100%;object-fit:cover;border-radius:6px}
+  .produto-suggestion-info{flex:1;min-width:0}
+  .produto-suggestion-nome{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+  .produto-suggestion-sub{font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .produto-suggestion-lote{font-size:10px;color:var(--text3);flex-shrink:0;font-weight:700}
+
   footer{padding:16px 20px;text-align:center;font-size:11px;color:var(--text3)}
 
   /* AUTENTICAÇÃO (login / setup) */
@@ -686,7 +700,10 @@
       </div>
       <div class="field">
         <label>Produto *</label>
-        <input type="text" id="lf-produto" placeholder="Nome do produto" oninput="upperCaseInput(this)">
+        <div class="produto-autocomplete-wrap">
+          <input type="text" id="lf-produto" placeholder="Nome do produto — ou busque um já cadastrado" oninput="upperCaseInput(this); abrirSugestoesProduto('lf')" onkeydown="navSugestoes(event,'lf')" autocomplete="off">
+          <div class="produto-suggestions" id="lf-produto-suggestions"></div>
+        </div>
       </div>
       <div class="field">
         <label>Doador / Estabelecimento</label>
@@ -754,7 +771,10 @@
       </div>
       <div class="field">
         <label>Produto *</label>
-        <input type="text" id="nf-produto" placeholder="Nome do produto" oninput="upperCaseInput(this)">
+        <div class="produto-autocomplete-wrap">
+          <input type="text" id="nf-produto" placeholder="Nome do produto — ou busque um já cadastrado" oninput="upperCaseInput(this); abrirSugestoesProduto('nf')" onkeydown="navSugestoes(event,'nf')" autocomplete="off">
+          <div class="produto-suggestions" id="nf-produto-suggestions"></div>
+        </div>
       </div>
       <div class="field">
         <label>Doador / Estabelecimento</label>
@@ -2610,7 +2630,127 @@ function showToast(icon, msg, type) {
 }
 
 document.addEventListener('keydown', e => {
-  if (e.key==='Escape') { closeModal(); closeModalPagamento(); closeModalLote(); closeModalNovo(); closeModalConfig(); closeModalUsuario(); fecharCamera(); }
+  if (e.key==='Escape') {
+    fecharSugestoes('nf'); fecharSugestoes('lf');
+    closeModal(); closeModalPagamento(); closeModalLote(); closeModalNovo(); closeModalConfig(); closeModalUsuario(); fecharCamera();
+  }
+});
+
+// ═══════════ AUTOCOMPLETE DE PRODUTO (busca nos lotes já cadastrados) ═══════════
+let _sugestaoAtiva = { nf: -1, lf: -1 };
+
+function abrirSugestoesProduto(prefix) {
+  const input = document.getElementById(prefix + '-produto');
+  const box = document.getElementById(prefix + '-produto-suggestions');
+  if (!input || !box) return;
+
+  const q = input.value.trim().toUpperCase();
+  const idEditando = prefix === 'lf' ? editingLoteDataId : null;
+
+  // Monta lista de lotes únicos pelo nome do produto (exclui o lote sendo editado)
+  const vistos = new Set();
+  const candidatos = Object.values(lotesCache)
+    .filter(l => {
+      if (idEditando && l.id === idEditando) return false;
+      const nome = (l.produto || '').toUpperCase();
+      if (vistos.has(nome)) return false;
+      if (q && !nome.includes(q)) return false;
+      vistos.add(nome);
+      return true;
+    })
+    .sort((a,b) => (a.produto||'').localeCompare(b.produto||''));
+
+  if (!candidatos.length) { fecharSugestoes(prefix); return; }
+
+  _sugestaoAtiva[prefix] = -1;
+
+  box.innerHTML = candidatos.slice(0, 12).map((l, i) => {
+    const fotoHtml = l.foto
+      ? `<div class="produto-suggestion-thumb"><img src="${l.foto}" alt=""></div>`
+      : `<div class="produto-suggestion-thumb">📦</div>`;
+    const sub = [l.estabelecimento, l.valorComercial ? fmtMoney(l.valorComercial) : ''].filter(Boolean).join(' · ');
+    return `<div class="produto-suggestion-item" data-idx="${i}"
+      onmousedown="selecionarSugestao(event,'${prefix}',${JSON.stringify(l.id).replace(/'/g,"\\'")})"
+      onmouseover="_sugestaoAtiva['${prefix}']=${i};_realcarSugestao('${prefix}')">
+      ${fotoHtml}
+      <div class="produto-suggestion-info">
+        <div class="produto-suggestion-nome">${escapeHtml(l.produto)}</div>
+        ${sub ? `<div class="produto-suggestion-sub">${escapeHtml(sub)}</div>` : ''}
+      </div>
+      <span class="produto-suggestion-lote">#${l.numero}</span>
+    </div>`;
+  }).join('');
+
+  box.classList.add('open');
+}
+
+function fecharSugestoes(prefix) {
+  const box = document.getElementById(prefix + '-produto-suggestions');
+  if (box) { box.classList.remove('open'); box.innerHTML = ''; }
+  _sugestaoAtiva[prefix] = -1;
+}
+
+function _realcarSugestao(prefix) {
+  const box = document.getElementById(prefix + '-produto-suggestions');
+  if (!box) return;
+  box.querySelectorAll('.produto-suggestion-item').forEach((el, i) => {
+    el.classList.toggle('ativo', i === _sugestaoAtiva[prefix]);
+    if (i === _sugestaoAtiva[prefix]) el.scrollIntoView({ block: 'nearest' });
+  });
+}
+
+function navSugestoes(e, prefix) {
+  const box = document.getElementById(prefix + '-produto-suggestions');
+  if (!box || !box.classList.contains('open')) return;
+  const items = box.querySelectorAll('.produto-suggestion-item');
+  if (!items.length) return;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _sugestaoAtiva[prefix] = Math.min(_sugestaoAtiva[prefix] + 1, items.length - 1);
+    _realcarSugestao(prefix);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _sugestaoAtiva[prefix] = Math.max(_sugestaoAtiva[prefix] - 1, -1);
+    _realcarSugestao(prefix);
+  } else if (e.key === 'Enter' && _sugestaoAtiva[prefix] >= 0) {
+    e.preventDefault();
+    e.stopPropagation();
+    const item = items[_sugestaoAtiva[prefix]];
+    item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  }
+}
+
+function selecionarSugestao(e, prefix, loteId) {
+  e.preventDefault();
+  const lote = lotesCache[loteId];
+  if (!lote) return;
+
+  document.getElementById(prefix + '-produto').value = lote.produto || '';
+  document.getElementById(prefix + '-estabelecimento').value = lote.estabelecimento || '';
+
+  const fmtVal = v => v ? v.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '';
+  document.getElementById(prefix + '-valorcomercial').value = fmtVal(lote.valorComercial);
+  document.getElementById(prefix + '-valorinicial').value = fmtVal(lote.valorInicial);
+  atualizarPctInicial(prefix);
+
+  if (lote.foto) {
+    document.getElementById(prefix + '-foto').value = lote.foto;
+    document.getElementById(prefix + '-photo-img').src = lote.foto;
+    document.getElementById(prefix + '-photo-preview').classList.add('has-photo');
+    document.getElementById(prefix + '-btn-remove-photo').style.display = 'flex';
+  }
+
+  fecharSugestoes(prefix);
+  showToast('✅', `Produto "${lote.produto}" copiado do lote #${lote.numero}`, 'success');
+}
+
+// Fecha sugestões ao clicar fora
+document.addEventListener('mousedown', e => {
+  ['nf','lf'].forEach(prefix => {
+    const wrap = document.getElementById(prefix + '-produto')?.closest('.produto-autocomplete-wrap');
+    if (wrap && !wrap.contains(e.target)) fecharSugestoes(prefix);
+  });
 });
 
 // ═══════════ ENTER FUNCIONA COMO TAB ═══════════
