@@ -690,9 +690,9 @@
         <input type="text" id="lf-numero" inputmode="numeric" placeholder="Ex.: 201">
       </div>
       <div class="field">
-        <label>Código de barras</label>
+        <label>Código de barras / Ref.</label>
         <div style="display:flex;gap:8px">
-          <input type="text" id="lf-codigobarras" placeholder="Ex.: 7891234567890" inputmode="numeric" style="font-family:'Courier New',monospace;letter-spacing:1px;flex:1">
+          <input type="text" id="lf-codigobarras" placeholder="Ex.: 7891234567890 ou VSP-30-W" style="font-family:'Courier New',monospace;letter-spacing:1px;flex:1">
           <button type="button" class="btn-cam" onclick="abrirCamera('lf')" style="padding:10px 14px" title="Ler pela câmera">📷</button>
           <button type="button" class="btn-outline" id="lf-btn-buscar-produto" onclick="buscarProdutoPorCodigo('lf')" style="white-space:nowrap">🌐 Buscar</button>
         </div>
@@ -761,9 +761,9 @@
         <input type="text" id="nf-numero" inputmode="numeric" placeholder="Próximo número sugerido">
       </div>
       <div class="field">
-        <label>Código de barras</label>
+        <label>Código de barras / Ref.</label>
         <div style="display:flex;gap:8px">
-          <input type="text" id="nf-codigobarras" placeholder="Ex.: 7891234567890" inputmode="numeric" style="font-family:'Courier New',monospace;letter-spacing:1px;flex:1">
+          <input type="text" id="nf-codigobarras" placeholder="Ex.: 7891234567890 ou VSP-30-W" style="font-family:'Courier New',monospace;letter-spacing:1px;flex:1">
           <button type="button" class="btn-cam" onclick="abrirCamera('nf')" style="padding:10px 14px" title="Ler pela câmera">📷</button>
           <button type="button" class="btn-outline" id="nf-btn-buscar-produto" onclick="buscarProdutoPorCodigo('nf')" style="white-space:nowrap">🌐 Buscar</button>
         </div>
@@ -2171,7 +2171,40 @@ async function buscarProdutoPorCodigo(prefix) {
   const hint = document.getElementById(prefix + '-codigo-hint');
   const btn = document.getElementById(prefix + '-btn-buscar-produto');
 
-  if (!codigo) { showToast('⚠️','Informe um código de barras primeiro.',''); return; }
+  if (!codigo) { showToast('⚠️','Informe um código de barras ou referência primeiro.',''); return; }
+
+  // ── Primeiro: busca nos lotes já cadastrados (código de barras OU referência) ──
+  const idEditando = prefix === 'lf' ? editingLoteDataId : null;
+  const codigoUp = codigo.toUpperCase();
+  const lotesLocal = Object.values(lotesCache).filter(l => {
+    if (idEditando && l.id === idEditando) return false;
+    const cb = (l.codigoBarras || '').toUpperCase();
+    return cb && cb === codigoUp;
+  });
+  if (lotesLocal.length) {
+    const lote = lotesLocal[0];
+    // preenche todos os campos como se tivesse selecionado no autocomplete
+    document.getElementById(prefix + '-produto').value = lote.produto || '';
+    document.getElementById(prefix + '-estabelecimento').value = lote.estabelecimento || '';
+    const fmtV = v => v ? v.toLocaleString('pt-BR',{minimumFractionDigits:2}) : '';
+    document.getElementById(prefix + '-valorcomercial').value = fmtV(lote.valorComercial);
+    document.getElementById(prefix + '-valorinicial').value = fmtV(lote.valorInicial);
+    atualizarPctInicial(prefix);
+    const fotoEl = document.getElementById(prefix + '-foto');
+    const imgEl  = document.getElementById(prefix + '-photo-img');
+    const prevEl = document.getElementById(prefix + '-photo-preview');
+    const remEl  = document.getElementById(prefix + '-btn-remove-photo');
+    if (lote.foto) {
+      if (fotoEl) fotoEl.value = lote.foto;
+      if (imgEl)  { imgEl.src = lote.foto; imgEl.style.display = 'block'; }
+      if (prevEl) prevEl.classList.add('has-photo');
+      if (remEl)  remEl.style.display = 'flex';
+    }
+    hint.style.color = 'var(--green)';
+    hint.textContent = `✅ Encontrado nos cadastros: lote #${lote.numero} — ${lote.produto}`;
+    showToast('✅', `Produto do lote #${lote.numero} preenchido!`, 'success');
+    return;
+  }
 
   btn.disabled = true;
   btn.textContent = '⏳ Buscando…';
