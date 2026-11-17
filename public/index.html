@@ -1933,7 +1933,7 @@ function autoAplicarDesconto(prefix) {
   const comercial = parseMoneyInput(document.getElementById(prefix + '-valorcomercial').value);
 
   if (comercial && pct) {
-    const inicial = comercial * (1 - pct / 100);
+    const inicial = Math.round(comercial * (1 - pct / 100));
     document.getElementById(prefix + '-valorinicial').value = inicial.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
   }
   atualizarPctInicial(prefix);
@@ -2729,16 +2729,31 @@ function selecionarSugestao(e, prefix, loteId) {
   document.getElementById(prefix + '-produto').value = lote.produto || '';
   document.getElementById(prefix + '-estabelecimento').value = lote.estabelecimento || '';
 
+  // Código de barras
+  const cbEl = document.getElementById(prefix + '-codigobarras');
+  if (cbEl) cbEl.value = lote.codigoBarras || '';
+
   const fmtVal = v => v ? v.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '';
   document.getElementById(prefix + '-valorcomercial').value = fmtVal(lote.valorComercial);
   document.getElementById(prefix + '-valorinicial').value = fmtVal(lote.valorInicial);
   atualizarPctInicial(prefix);
 
+  // Foto
+  const fotoEl = document.getElementById(prefix + '-foto');
+  const imgEl = document.getElementById(prefix + '-photo-img');
+  const previewEl = document.getElementById(prefix + '-photo-preview');
+  const removeBtnEl = document.getElementById(prefix + '-btn-remove-photo');
+
   if (lote.foto) {
-    document.getElementById(prefix + '-foto').value = lote.foto;
-    document.getElementById(prefix + '-photo-img').src = lote.foto;
-    document.getElementById(prefix + '-photo-preview').classList.add('has-photo');
-    document.getElementById(prefix + '-btn-remove-photo').style.display = 'flex';
+    if (fotoEl) fotoEl.value = lote.foto;
+    if (imgEl) { imgEl.src = lote.foto; imgEl.style.display = 'block'; }
+    if (previewEl) previewEl.classList.add('has-photo');
+    if (removeBtnEl) removeBtnEl.style.display = 'flex';
+  } else {
+    if (fotoEl) fotoEl.value = '';
+    if (imgEl) { imgEl.src = ''; imgEl.style.display = 'none'; }
+    if (previewEl) previewEl.classList.remove('has-photo');
+    if (removeBtnEl) removeBtnEl.style.display = 'none';
   }
 
   fecharSugestoes(prefix);
