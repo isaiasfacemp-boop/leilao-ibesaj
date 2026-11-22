@@ -381,6 +381,22 @@
       </div>
       <button type="button" class="btn" style="width:100%;justify-content:center" onclick="doLogin()">🔑 Entrar</button>
     </form>
+
+    <!-- TROCAR SENHA (primeiro acesso) -->
+    <form id="form-trocar" style="display:none" onsubmit="return false">
+      <div class="auth-error" id="trocar-error"></div>
+      <div class="auth-hint" style="margin:0 0 14px;text-align:left">👋 <b>Primeiro acesso.</b> Por segurança, crie uma senha só sua para continuar.</div>
+      <div class="field">
+        <label>Nova senha</label>
+        <input type="password" id="trocar-senha" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label>Repita a nova senha</label>
+        <input type="password" id="trocar-senha2" placeholder="Digite a mesma senha" autocomplete="new-password">
+      </div>
+      <button type="button" class="btn" id="btn-trocar-senha" style="width:100%;justify-content:center" onclick="doTrocarSenha()">🔒 Salvar nova senha e entrar</button>
+      <div class="auth-hint"><a href="#" onclick="sairDaTrocaSenha();return false" style="color:var(--text2)">Sair</a></div>
+    </form>
   </div>
 </div>
 
@@ -872,8 +888,9 @@
         <input type="text" id="uf-username" placeholder="Ex.: joao" autocomplete="off">
       </div>
       <div class="field">
-        <label>Senha *</label>
+        <label>Senha provisória *</label>
         <input type="password" id="uf-password" placeholder="Mínimo 4 caracteres" autocomplete="new-password">
+        <span style="font-size:11px;color:var(--text3)">No primeiro acesso, a pessoa vai criar a própria senha.</span>
       </div>
       <div class="field">
         <label style="display:flex;align-items:center;gap:8px;font-weight:600;color:var(--text)">
@@ -992,6 +1009,12 @@ async function api(path, options = {}) {
     showAuthOverlay();
     throw Object.assign(new Error('nao_autenticado'), { status: 401, data });
   }
+  if (resp.status === 403 && data && data.error === 'trocar_senha') {
+    if (currentUser) currentUser.mustChange = true;
+    if (pollInterval) clearInterval(pollInterval);
+    showAuthOverlay('trocar');
+    throw Object.assign(new Error('trocar_senha'), { status: 403, data });
+  }
   if (!resp.ok) {
     throw Object.assign(new Error((data && data.message) || 'Erro'), { status: resp.status, data });
   }
@@ -1021,7 +1044,7 @@ async function init() {
   try {
     const me = await api('/me');
     currentUser = me.user;
-    await entrarNoSistema();
+    await depoisDoLogin();
   } catch(e) {
     showAuthOverlay('login');
   }
@@ -1032,6 +1055,8 @@ function showAuthOverlay(mode) {
   document.getElementById('auth-loading').style.display = mode ? 'none' : 'block';
   document.getElementById('form-setup').style.display = mode === 'setup' ? 'block' : 'none';
   document.getElementById('form-login').style.display = mode === 'login' ? 'block' : 'none';
+  document.getElementById('form-trocar').style.display = mode === 'trocar' ? 'block' : 'none';
+  if (mode === 'trocar') setTimeout(() => document.getElementById('trocar-senha').focus(), 100);
   if (mode === 'login') setTimeout(() => document.getElementById('login-username').focus(), 100);
   if (mode === 'setup') setTimeout(() => document.getElementById('setup-username').focus(), 100);
 }
@@ -1075,11 +1100,58 @@ async function doLogin() {
     const result = await api('/login', { method: 'POST', body: JSON.stringify({ username, password }) });
     authToken = result.token; // fica só na memória desta aba — não persiste
     currentUser = result.user;
-    await entrarNoSistema();
+    await depoisDoLogin();
   } catch(e) {
     errEl.textContent = (e.data && e.data.message) || 'Usuário ou senha incorretos.';
     errEl.classList.add('show');
   }
+}
+
+// Primeiro acesso: se o administrador cadastrou o usuário, ele precisa criar a própria senha antes de entrar
+async function depoisDoLogin() {
+  if (currentUser && currentUser.mustChange) {
+    document.getElementById('trocar-senha').value = '';
+    document.getElementById('trocar-senha2').value = '';
+    document.getElementById('trocar-error').classList.remove('show');
+    showAuthOverlay('trocar');
+    return;
+  }
+  await entrarNoSistema();
+}
+
+async function doTrocarSenha() {
+  const nova = document.getElementById('trocar-senha').value;
+  const nova2 = document.getElementById('trocar-senha2').value;
+  const errEl = document.getElementById('trocar-error');
+  const btn = document.getElementById('btn-trocar-senha');
+  errEl.classList.remove('show');
+
+  if (nova.length < 6) { errEl.textContent = 'A nova senha precisa ter pelo menos 6 caracteres.'; errEl.classList.add('show'); return; }
+  if (nova !== nova2) { errEl.textContent = 'As duas senhas não são iguais.'; errEl.classList.add('show'); return; }
+
+  btn.disabled = true;
+  try {
+    await api('/change-password', { method: 'POST', body: JSON.stringify({ password: nova }) });
+    currentUser.mustChange = false;
+    document.getElementById('trocar-senha').value = '';
+    document.getElementById('trocar-senha2').value = '';
+    await entrarNoSistema();
+    showToast('✅', 'Senha alterada com sucesso!', 'success');
+  } catch(e) {
+    errEl.textContent = (e.data && e.data.message) || 'Erro ao salvar a senha. Tente novamente.';
+    errEl.classList.add('show');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function sairDaTrocaSenha() {
+  try { api('/logout', { method: 'POST' }); } catch(e) {}
+  authToken = null;
+  currentUser = null;
+  document.getElementById('login-username').value = '';
+  document.getElementById('login-password').value = '';
+  showAuthOverlay('login');
 }
 
 async function doLogout() {
@@ -2530,6 +2602,7 @@ async function renderUsuarios() {
         👤 ${escapeHtml(u.username)}
         ${u.master ? '<span class="tag-master">ADMIN</span>' : ''}
         ${u.username === currentUser.username ? '<span style="color:var(--text3);font-size:11px">(você)</span>' : ''}
+        ${u.must_change ? '<span style="color:var(--accent);font-size:11px;font-weight:700" title="Ainda não trocou a senha provisória">🔑 senha provisória</span>' : ''}
       </div>
       ${u.username !== currentUser.username ? `<button class="btn-sm danger" onclick="excluirUsuario('${escapeHtml(u.username)}')">🗑️ Remover</button>` : ''}
     </div>
@@ -2823,10 +2896,10 @@ document.addEventListener('keydown', e => {
   if (tag !== 'INPUT' && tag !== 'SELECT') return;
 
   // Telas de login/setup (fora dos modal-overlay)
-  const authForm = ativo.closest('#form-login, #form-setup');
+  const authForm = ativo.closest('#form-login, #form-setup, #form-trocar');
   if (authForm) {
     e.preventDefault();
-    if (authForm.id === 'form-login') doLogin(); else doSetup();
+    if (authForm.id === 'form-login') doLogin(); else if (authForm.id === 'form-trocar') doTrocarSenha(); else doSetup();
     return;
   }
 
