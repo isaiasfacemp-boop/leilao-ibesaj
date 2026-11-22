@@ -43,12 +43,21 @@ function str(v, max = 300) {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
 }
 
-async function insertUser(env, { username, password, master }) {
+// Coluna que marca "precisa trocar a senha no primeiro acesso" (criada sozinha na primeira chamada)
+let mustChangeColunaOk = false;
+async function garantirColunaMustChange(env) {
+  if (mustChangeColunaOk) return;
+  try { await env.DB.prepare("ALTER TABLE users ADD COLUMN must_change INTEGER DEFAULT 0").run(); } catch (e) { /* já existe */ }
+  mustChangeColunaOk = true;
+}
+
+async function insertUser(env, { username, password, master, mustChange }) {
+  await garantirColunaMustChange(env);
   const salt = randomHex(16);
   const hash = await hashPassword(password, salt);
   await env.DB.prepare(
-    `INSERT INTO users (username, password_hash, salt, master, created_at) VALUES (?, ?, ?, ?, datetime('now'))`
-  ).bind(username, hash, salt, master ? 1 : 0).run();
+    `INSERT INTO users (username, password_hash, salt, master, created_at, must_change) VALUES (?, ?, ?, ?, datetime('now'), ?)`
+  ).bind(username, hash, salt, master ? 1 : 0, mustChange ? 1 : 0).run();
 }
 
 async function createSession(env, username) {
@@ -64,12 +73,12 @@ async function getAuthUser(request, env) {
   const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
   if (!token) return null;
   const row = await env.DB.prepare(
-    `SELECT u.username, u.master FROM sessions s
+    `SELECT u.username, u.master, u.must_change FROM sessions s
      JOIN users u ON u.username = s.username
      WHERE s.token = ? AND s.expires_at > ?`
   ).bind(token, Date.now()).first();
   if (!row) return null;
-  return { username: row.username, master: !!row.master, token };
+  return { username: row.username, master: !!row.master, mustChange: !!row.must_change, token };
 }
 
 function loteFromRow(row) {
@@ -230,6 +239,7 @@ async function aprenderProduto(env, codigo, nome, usuario, foto) {
 async function handleApi(request, env, url) {
   const path = url.pathname;
   const method = request.method;
+  await garantirColunaMustChange(env);
 
   // ───────── SETUP (primeiro admin) ─────────
   if (path === "/api/setup-status" && method === "GET") {
@@ -259,7 +269,7 @@ async function handleApi(request, env, url) {
       return json({ error: "credenciais", message: "Usuário ou senha incorretos." }, 401);
     }
     const token = await createSession(env, username);
-    return json({ token, user: { username: row.username, master: !!row.master } });
+    return json({ token, user: { username: row.username, master: !!row.master, mustChange: !!row.must_change } });
   }
 
   // ───────── Tudo abaixo exige login ─────────
@@ -271,8 +281,32 @@ async function handleApi(request, env, url) {
     return json({ ok: true });
   }
 
+  // ───────── TROCA DE SENHA (primeiro acesso ou quando o usuário quiser) ─────────
+  if (path === "/api/change-password" && method === "POST") {
+    const body = await readJson(request, 2000);
+    const nova = typeof body.password === "string" ? body.password : "";
+    if (nova.length < 6) return json({ error: "dados", message: "A nova senha precisa ter pelo menos 6 caracteres." }, 400);
+    const row = await env.DB.prepare("SELECT salt, password_hash FROM users WHERE username = ?").bind(auth.username).first();
+    if (!row) return json({ error: "nao_encontrado" }, 404);
+    if ((await hashPassword(nova, row.salt)) === row.password_hash) {
+      return json({ error: "igual", message: "A nova senha precisa ser diferente da senha provisória." }, 400);
+    }
+    const salt = randomHex(16);
+    const hash = await hashPassword(nova, salt);
+    await env.DB.batch([
+      env.DB.prepare("UPDATE users SET password_hash = ?, salt = ?, must_change = 0 WHERE username = ?").bind(hash, salt, auth.username),
+      env.DB.prepare("DELETE FROM sessions WHERE username = ? AND token != ?").bind(auth.username, auth.token)
+    ]);
+    return json({ ok: true });
+  }
+
+  // Enquanto não trocar a senha provisória, nada mais do sistema funciona
+  if (auth.mustChange && path !== "/api/me") {
+    return json({ error: "trocar_senha", message: "Defina uma nova senha para continuar." }, 403);
+  }
+
   if (path === "/api/me" && method === "GET") {
-    return json({ user: { username: auth.username, master: auth.master } });
+    return json({ user: { username: auth.username, master: auth.master, mustChange: auth.mustChange } });
   }
 
   if (path === "/api/verify-password" && method === "POST") {
@@ -340,10 +374,14 @@ async function handleApi(request, env, url) {
     const cfg = await env.DB.prepare("SELECT descontoPadrao FROM config WHERE id = 1").first();
     const pct = parseFloat((cfg && cfg.descontoPadrao || "0").replace(",", "."));
     if (!pct) return json({ error: "sem_desconto", message: "Nenhum desconto padrão configurado." }, 400);
-    const result = await env.DB.prepare(
-      "UPDATE lotes SET valorInicial = ROUND(valorComercial * ?, 2) WHERE valorComercial > 0"
-    ).bind(1 - pct / 100).run();
-    return json({ ok: true, afetados: result.meta.changes, percentual: pct });
+    // arredonda sempre para cima, em múltiplos de 5 (82 -> 85, 86 -> 90)
+    const { results } = await env.DB.prepare("SELECT id, valorComercial FROM lotes WHERE valorComercial > 0").all();
+    const stmts = (results || []).map((r) => {
+      const bruto = Math.round(r.valorComercial * (1 - pct / 100) * 100) / 100;
+      return env.DB.prepare("UPDATE lotes SET valorInicial = ? WHERE id = ?").bind(Math.ceil(bruto / 5) * 5, r.id);
+    });
+    for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50));
+    return json({ ok: true, afetados: stmts.length, percentual: pct });
   }
 
   if (path === "/api/leilao/zerar" && method === "POST") {
@@ -446,7 +484,7 @@ async function handleApi(request, env, url) {
 
   // ───────── USUÁRIOS (somente admin/master) ─────────
   if (path === "/api/users" && method === "GET") {
-    const { results } = await env.DB.prepare("SELECT username, master, created_at FROM users ORDER BY master DESC, username").all();
+    const { results } = await env.DB.prepare("SELECT username, master, created_at, must_change FROM users ORDER BY master DESC, username").all();
     return json({ users: results || [] });
   }
 
@@ -458,7 +496,7 @@ async function handleApi(request, env, url) {
     if (!username || password.length < 4) return json({ error: "dados", message: "Informe usuário e uma senha com pelo menos 4 caracteres." }, 400);
     const exists = await env.DB.prepare("SELECT 1 FROM users WHERE username = ?").bind(username).first();
     if (exists) return json({ error: "existe", message: "Já existe um usuário com esse nome." }, 409);
-    await insertUser(env, { username, password, master: !!body.master });
+    await insertUser(env, { username, password, master: !!body.master, mustChange: true });
     return json({ ok: true });
   }
 
