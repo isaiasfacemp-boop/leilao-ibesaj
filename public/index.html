@@ -697,7 +697,6 @@
           <button type="button" class="btn-outline" id="lf-btn-buscar-produto" onclick="buscarProdutoPorCodigo('lf')" style="white-space:nowrap">🌐 Buscar</button>
         </div>
         <span id="lf-codigo-hint" style="font-size:11px;color:var(--text3)"></span>
-        <div id="lf-ref-results" class="produto-suggestions"></div>
       </div>
       <div class="field">
         <label>Produto *</label>
@@ -716,7 +715,7 @@
       </div>
       <div class="field">
         <label>Valor inicial (R$)</label>
-        <input type="text" id="lf-valorinicial" placeholder="0,00" oninput="maskMoney(this); atualizarPctInicial('lf')" onblur="arredondarValorInicial(this,'lf')">
+        <input type="text" id="lf-valorinicial" placeholder="0,00" oninput="maskMoney(this); atualizarPctInicial('lf')">
         <span id="lf-pct-inicial-hint" class="photo-hint"></span>
       </div>
     </div>
@@ -769,7 +768,6 @@
           <button type="button" class="btn-outline" id="nf-btn-buscar-produto" onclick="buscarProdutoPorCodigo('nf')" style="white-space:nowrap">🌐 Buscar</button>
         </div>
         <span id="nf-codigo-hint" style="font-size:11px;color:var(--text3)"></span>
-        <div id="nf-ref-results" class="produto-suggestions"></div>
       </div>
       <div class="field">
         <label>Produto *</label>
@@ -788,7 +786,7 @@
       </div>
       <div class="field">
         <label>Valor inicial (R$)</label>
-        <input type="text" id="nf-valorinicial" placeholder="0,00" oninput="maskMoney(this); atualizarPctInicial('nf')" onblur="arredondarValorInicial(this,'nf')">
+        <input type="text" id="nf-valorinicial" placeholder="0,00" oninput="maskMoney(this); atualizarPctInicial('nf')">
         <span id="nf-pct-inicial-hint" class="photo-hint"></span>
       </div>
     </div>
@@ -1880,9 +1878,8 @@ function abrirModalLote(id) {
   document.getElementById('lf-produto').value = lote.produto || '';
   document.getElementById('lf-estabelecimento').value = lote.estabelecimento || '';
   document.getElementById('lf-valorcomercial').value = lote.valorComercial ? lote.valorComercial.toLocaleString('pt-BR',{minimumFractionDigits:2}) : '';
-  document.getElementById('lf-valorinicial').value = lote.valorInicial ? Math.round(lote.valorInicial).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '';
+  document.getElementById('lf-valorinicial').value = lote.valorInicial ? lote.valorInicial.toLocaleString('pt-BR',{minimumFractionDigits:2}) : '';
   document.getElementById('lf-codigo-hint').textContent = '';
-  fecharRefResults('lf');
   atualizarPctInicial('lf');
 
   if (lote.foto) {
@@ -1901,7 +1898,6 @@ function abrirModalLote(id) {
 }
 
 function closeModalLote() {
-  fecharRefResults('lf');
   document.getElementById('modal-lote-overlay').classList.remove('open');
   editingLoteDataId = null;
 }
@@ -1930,15 +1926,6 @@ function parseMoneyInput(str) {
   return isNaN(n) ? 0 : n;
 }
 
-// Arredonda o valor inicial para o reais inteiro mais próximo (sem centavos)
-function arredondarValorInicial(el, prefix) {
-  const v = parseMoneyInput(el.value);
-  if (!v) return;
-  const arred = Math.round(v);
-  el.value = arred.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if (prefix) atualizarPctInicial(prefix);
-}
-
 // ═══════════ % DO VALOR INICIAL SOBRE O VALOR COMERCIAL ═══════════
 function autoAplicarDesconto(prefix) {
   const cfg = getConfigAtual();
@@ -1946,7 +1933,9 @@ function autoAplicarDesconto(prefix) {
   const comercial = parseMoneyInput(document.getElementById(prefix + '-valorcomercial').value);
 
   if (comercial && pct) {
-    const inicial = Math.round(comercial * (1 - pct / 100));
+    // Arredonda SEMPRE para cima, para múltiplo de 5 (82 -> 85, 86 -> 90, 85 -> 85)
+    const bruto = Math.round(comercial * (1 - pct / 100) * 100) / 100;
+    const inicial = Math.ceil(bruto / 5) * 5;
     document.getElementById(prefix + '-valorinicial').value = inicial.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
   }
   atualizarPctInicial(prefix);
@@ -2047,14 +2036,12 @@ function abrirModalNovo() {
   document.getElementById('nf-valorinicial').value = '';
   document.getElementById('nf-codigo-hint').textContent = '';
   document.getElementById('nf-pct-inicial-hint').textContent = '';
-  fecharRefResults('nf');
   removePhoto('nf');
   document.getElementById('modal-novo-overlay').classList.add('open');
   setTimeout(() => document.getElementById('nf-codigobarras').focus(), 100);
 }
 
 function closeModalNovo() {
-  fecharRefResults('nf');
   document.getElementById('modal-novo-overlay').classList.remove('open');
 }
 
@@ -2201,10 +2188,9 @@ async function buscarProdutoPorCodigo(prefix) {
     // preenche todos os campos como se tivesse selecionado no autocomplete
     document.getElementById(prefix + '-produto').value = lote.produto || '';
     document.getElementById(prefix + '-estabelecimento').value = lote.estabelecimento || '';
-    const fmtV  = v => v ? v.toLocaleString('pt-BR',{minimumFractionDigits:2}) : '';
-    const fmtVI = v => v ? Math.round(v).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '';
+    const fmtV = v => v ? v.toLocaleString('pt-BR',{minimumFractionDigits:2}) : '';
     document.getElementById(prefix + '-valorcomercial').value = fmtV(lote.valorComercial);
-    document.getElementById(prefix + '-valorinicial').value = fmtVI(lote.valorInicial);
+    document.getElementById(prefix + '-valorinicial').value = fmtV(lote.valorInicial);
     atualizarPctInicial(prefix);
     const fotoEl = document.getElementById(prefix + '-foto');
     const imgEl  = document.getElementById(prefix + '-photo-img');
@@ -2219,29 +2205,6 @@ async function buscarProdutoPorCodigo(prefix) {
     hint.style.color = 'var(--green)';
     hint.textContent = `✅ Encontrado nos cadastros: lote #${lote.numero} — ${lote.produto}`;
     showToast('✅', `Produto do lote #${lote.numero} preenchido!`, 'success');
-    return;
-  }
-
-  // ── Segundo: busca parcial por referência nos lotes cadastrados ──
-  // (só quando NÃO é um código de barras numérico padrão)
-  const ehBarcodeNumerico = /^\d{8,14}$/.test(codigo);
-  if (!ehBarcodeNumerico) {
-    const matchesParciais = Object.values(lotesCache).filter(l => {
-      if (idEditando && l.id === idEditando) return false;
-      const cb   = (l.codigoBarras || '').toUpperCase();
-      const prod = (l.produto || '').toUpperCase();
-      return (cb && cb.includes(codigoUp)) || prod.includes(codigoUp);
-    });
-    if (matchesParciais.length) {
-      mostrarRefResults(prefix, matchesParciais, codigo);
-      hint.style.color = 'var(--text2)';
-      hint.textContent = `🔍 ${matchesParciais.length} resultado(s) com "${codigo}" — selecione abaixo ou preencha manualmente.`;
-      return;
-    }
-    // Nenhum resultado interno para referência → avisa sem chamar Open Food Facts
-    hint.style.color = 'var(--accent)';
-    hint.textContent = `⚠️ Referência "${codigo}" não encontrada nos lotes cadastrados. Preencha manualmente.`;
-    showToast('ℹ️', 'Referência não encontrada nos lotes cadastrados.', '');
     return;
   }
 
@@ -2274,66 +2237,6 @@ async function buscarProdutoPorCodigo(prefix) {
     btn.disabled = false;
     btn.textContent = '🌐 Buscar';
   }
-}
-
-// ─── Busca parcial por referência: exibe dropdown com lotes encontrados ───
-function mostrarRefResults(prefix, lotes, termo) {
-  const el = document.getElementById(prefix + '-ref-results');
-  if (!el) return;
-  el.innerHTML = lotes.slice(0, 8).map(l => {
-    const fotoHtml = l.foto
-      ? `<div class="produto-suggestion-thumb"><img src="${escapeHtml(l.foto)}" alt=""></div>`
-      : `<div class="produto-suggestion-thumb">📦</div>`;
-    const sub = [
-      l.codigoBarras ? 'Ref.: ' + escapeHtml(l.codigoBarras) : '',
-      l.estabelecimento ? escapeHtml(l.estabelecimento) : ''
-    ].filter(Boolean).join(' · ');
-    return `<div class="produto-suggestion-item" onmousedown="selecionarRefResult(event,'${prefix}','${escapeHtml(String(l.id))}')">
-      ${fotoHtml}
-      <div class="produto-suggestion-info">
-        <div class="produto-suggestion-nome">${escapeHtml(l.produto)}</div>
-        ${sub ? `<div class="produto-suggestion-sub">${sub}</div>` : ''}
-      </div>
-      <span class="produto-suggestion-lote">#${l.numero}</span>
-    </div>`;
-  }).join('');
-  el.classList.add('open');
-}
-
-function selecionarRefResult(e, prefix, loteId) {
-  e.preventDefault();
-  const lote = lotesCache[loteId];
-  if (!lote) return;
-
-  document.getElementById(prefix + '-produto').value = lote.produto || '';
-  document.getElementById(prefix + '-estabelecimento').value = lote.estabelecimento || '';
-  const fmtV  = v => v ? v.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '';
-  const fmtVI = v => v ? Math.round(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '';
-  document.getElementById(prefix + '-valorcomercial').value = fmtV(lote.valorComercial);
-  document.getElementById(prefix + '-valorinicial').value = fmtVI(lote.valorInicial);
-  atualizarPctInicial(prefix);
-
-  const fotoEl   = document.getElementById(prefix + '-foto');
-  const imgEl    = document.getElementById(prefix + '-photo-img');
-  const prevEl   = document.getElementById(prefix + '-photo-preview');
-  const remEl    = document.getElementById(prefix + '-btn-remove-photo');
-  if (lote.foto) {
-    if (fotoEl) fotoEl.value = lote.foto;
-    if (imgEl)  { imgEl.src = lote.foto; imgEl.style.display = 'block'; }
-    if (prevEl) prevEl.classList.add('has-photo');
-    if (remEl)  remEl.style.display = 'flex';
-  }
-
-  const hint = document.getElementById(prefix + '-codigo-hint');
-  hint.style.color = 'var(--green)';
-  hint.textContent = `✅ Produto do lote #${lote.numero} preenchido.`;
-  fecharRefResults(prefix);
-  showToast('✅', `Produto "${lote.produto}" copiado do lote #${lote.numero}`, 'success');
-}
-
-function fecharRefResults(prefix) {
-  const el = document.getElementById(prefix + '-ref-results');
-  if (el) { el.innerHTML = ''; el.classList.remove('open'); }
 }
 
 async function consultarOpenFoodFacts(codigo) {
@@ -2865,10 +2768,9 @@ function selecionarSugestao(e, prefix, loteId) {
   const cbEl = document.getElementById(prefix + '-codigobarras');
   if (cbEl) cbEl.value = lote.codigoBarras || '';
 
-  const fmtVal  = v => v ? v.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '';
-  const fmtValI = v => v ? Math.round(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '';
+  const fmtVal = v => v ? v.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '';
   document.getElementById(prefix + '-valorcomercial').value = fmtVal(lote.valorComercial);
-  document.getElementById(prefix + '-valorinicial').value = fmtValI(lote.valorInicial);
+  document.getElementById(prefix + '-valorinicial').value = fmtVal(lote.valorInicial);
   atualizarPctInicial(prefix);
 
   // Foto
@@ -2893,18 +2795,11 @@ function selecionarSugestao(e, prefix, loteId) {
   showToast('✅', `Produto "${lote.produto}" copiado do lote #${lote.numero}`, 'success');
 }
 
-// Fecha sugestões e ref-results ao clicar fora
+// Fecha sugestões ao clicar fora
 document.addEventListener('mousedown', e => {
   ['nf','lf'].forEach(prefix => {
     const wrap = document.getElementById(prefix + '-produto')?.closest('.produto-autocomplete-wrap');
     if (wrap && !wrap.contains(e.target)) fecharSugestoes(prefix);
-
-    const refEl = document.getElementById(prefix + '-ref-results');
-    const cbEl  = document.getElementById(prefix + '-codigobarras');
-    if (refEl && refEl.classList.contains('open') &&
-        !refEl.contains(e.target) && e.target !== cbEl) {
-      fecharRefResults(prefix);
-    }
   });
 });
 
